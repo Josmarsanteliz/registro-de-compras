@@ -6,6 +6,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "test": "node test-core.js",
+    "smoke": "electron smoke.js",
     "dist": "electron-builder --win nsis"
   },
   "author": "",

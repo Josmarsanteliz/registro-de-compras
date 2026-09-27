@@ -13,9 +13,9 @@ En Windows con PowerShell hay que usar **`npm.cmd`**, no `npm` (Error de *Execut
 
 ```bat
 npm.cmd start                              :: arranca la app
+npm.cmd test                               :: pruebas de la lógica pura (rápido, sin Electron ni npm install)
+npm.cmd run smoke                          :: smoke test end-to-end (ventana oculta; necesita npm.cmd install)
 npm.cmd run dist                           :: genera release\Registro-de-Compras-Setup.exe (instalador)
-node test-core.js                          :: pruebas de la lógica pura (rápido, sin Electron)
-node_modules\.bin\electron.cmd smoke.js    :: smoke test end-to-end (ventana oculta)
 instalar.bat                               :: descarga el instalador de la release de GitHub
 ```
 

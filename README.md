@@ -80,9 +80,9 @@ compras\
 ## Comandos
 ```bat
 npm.cmd start                  :: inicia la app
+npm.cmd test                   :: corre las pruebas de la lógica (no necesita instalar nada)
+npm.cmd run smoke              :: corre el smoke test (necesita npm.cmd install antes)
 npm.cmd run dist               :: genera release\Registro-de-Compras-Setup.exe (instalador)
-node test-core.js              :: corre las pruebas de la lógica
-node_modules\.bin\electron.cmd smoke.js   :: corre el smoke test
 ```
 
 ## Publicar una versión nueva

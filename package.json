@@ -24,7 +24,7 @@
       "main.js",
       "preload.js",
       "core.js",
-      "bcv.js",
+      "mercado.js",
       "renderer/**/*",
       "Logo/PNG.png",
       "Logo/app.ico",

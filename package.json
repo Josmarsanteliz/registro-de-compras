@@ -1,7 +1,7 @@
 {
   "name": "registro-compras",
   "productName": "Registro de Compras",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Registro personal de compras, conversiones y préstamos en BTC, USDT, USD y Bs, con tasa del BCV automática. 100% local.",
   "main": "main.js",
   "scripts": {

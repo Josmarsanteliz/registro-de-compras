@@ -387,16 +387,58 @@ app.whenReady().then(async () => {
           $('#cv-tasa').dispatchEvent(new Event('change', { bubbles: true }));
           await sleep(120);
           out.cvResultado = ($('#cv-resultado') || {}).textContent || '';
-          $('#cv-invertir').checked = true;
-          $('#cv-monto').dispatchEvent(new Event('input', { bubbles: true }));
-          $('#cv-invertir').dispatchEvent(new Event('change', { bubbles: true }));
+          // La direccion ahora se cambia con el boton, no con una casilla.
+          $('#cv-cambiar').click();
           await sleep(120);
           out.cvInvertido = ($('#cv-resultado') || {}).textContent || '';
-          $('#cv-invertir').checked = false;
+          $('#cv-cambiar').click();
+          await sleep(80);
         }
 
         ok('mercado-handler', out.mercadoHandlerOk === true);
         ok('tasas-visible', out.tasasVisible === true);
+
+        if (out.mercadoOnline) {
+          // Filtro por moneda: EUR deja 2 tarjetas, USD deja 2, Todas deja 4.
+          out.filtroTodas = $$('#mercado-actual .mercado-card').length;
+          $('#mercado-filtro .chip-btn[data-filtro="EUR"]').click();
+          await sleep(120);
+          out.filtroEur = $$('#mercado-actual .mercado-card').length;
+          out.filtroEurActivo = $$('#mercado-filtro .chip-btn.active').length;
+          out.filtroEurTexto = ($$('#mercado-filtro .chip-btn.active')[0] || {}).textContent || '';
+          $('#mercado-filtro .chip-btn[data-filtro="USD"]').click();
+          await sleep(120);
+          out.filtroUsd = $$('#mercado-actual .mercado-card').length;
+          $('#mercado-filtro .chip-btn[data-filtro="todas"]').click();
+          await sleep(120);
+          out.filtroVuelta = $$('#mercado-actual .mercado-card').length;
+
+          // Boton de direccion: el texto y las unidades tienen que cambiar.
+          $('#cv-monto').value = 1000;
+          $('#cv-tasa').value = 'bcv';
+          $('#cv-monto').dispatchEvent(new Event('input', { bubbles: true }));
+          $('#cv-tasa').dispatchEvent(new Event('change', { bubbles: true }));
+          await sleep(120);
+          out.dirAntes = ($('#cv-cambiar') || {}).textContent || '';
+          out.unidadAntes = ($('#cv-unidad') || {}).textContent || '';
+          out.prefijoAntes = ($('#cv-prefijo') || {}).textContent || '';
+          out.resAntes = ($('#cv-resultado') || {}).textContent || '';
+
+          $('#cv-cambiar').click();
+          await sleep(120);
+          out.dirDespues = ($('#cv-cambiar') || {}).textContent || '';
+          out.unidadDespues = ($('#cv-unidad') || {}).textContent || '';
+          out.prefijoDespues = ($('#cv-prefijo') || {}).textContent || '';
+          out.resDespues = ($('#cv-resultado') || {}).textContent || '';
+          $('#cv-cambiar').click();
+          await sleep(80);
+
+          // Clic en una tarjeta: usa esa tasa en el convertidor.
+          const tarjetaPar = document.querySelector('#mercado-actual [data-usar-tasa="paralelo"]');
+          if (tarjetaPar) tarjetaPar.click();
+          await sleep(120);
+          out.tasaTrasClic = $('#cv-tasa').value;
+        }
         if (out.mercadoOnline) {
           ok('tasas-4-tarjetas', out.mercadoCards === 4);
           ok('tasas-convertidor-opciones', out.cvOpciones >= 1);
@@ -404,6 +446,16 @@ app.whenReady().then(async () => {
           ok('tasas-conversion-100usd', out.cvResultado.replace(/\\D/g, '').startsWith(out.cvEsperado));
           ok('tasas-conversion-invertida', /USD/.test(out.cvInvertido));
           ok('tasas-historial', out.histFilas >= 1);
+          ok('filtro-todas-4', out.filtroTodas === 4);
+          ok('filtro-eur-2', out.filtroEur === 2);
+          ok('filtro-usd-2', out.filtroUsd === 2);
+          ok('filtro-vuelta-4', out.filtroVuelta === 4);
+          ok('filtro-chip-activo', out.filtroEurActivo === 1 && out.filtroEurTexto.trim() === 'EUR');
+          ok('direccion-cambia-texto', out.dirAntes !== out.dirDespues && /Bs/.test(out.dirDespues));
+          ok('direccion-cambia-unidad', out.unidadAntes === 'USD' && out.unidadDespues === 'Bs');
+          ok('direccion-cambia-prefijo', out.prefijoAntes.trim() === 'Bs.' && out.prefijoDespues.trim() === '');
+          ok('direccion-cambia-resultado', out.resAntes !== out.resDespues);
+          ok('tarjeta-selecciona-tasa', out.tasaTrasClic === 'paralelo');
         } else {
           // Sin internet: la vista debe explicar que no hay tasas, no romperse.
           ok('tasas-estado-vacio', out.estadoVacio === 1 && out.mercadoConValor === 0);
@@ -479,6 +531,16 @@ app.whenReady().then(async () => {
     if (!ui.steps.includes('tasas-4-tarjetas: ok')) failures.push('faltan tarjetas en Tasas (= ' + ui.mercadoCards + ')');
     if (!ui.steps.includes('tasas-conversion-100usd: ok')) failures.push('el convertidor no calcula (= ' + out0(ui.cvResultado) + ')');
     if (!ui.steps.includes('mercado-handler: ok')) failures.push('el handler de mercado no responde');
+    if (!ui.steps.includes('filtro-todas-4: ok')) failures.push('el filtro "Todas" no muestra 4 tarjetas');
+    if (!ui.steps.includes('filtro-eur-2: ok')) failures.push('el filtro EUR no deja 2 tarjetas (= ' + ui.filtroEur + ')');
+    if (!ui.steps.includes('filtro-usd-2: ok')) failures.push('el filtro USD no deja 2 tarjetas (= ' + ui.filtroUsd + ')');
+    if (!ui.steps.includes('filtro-vuelta-4: ok')) failures.push('el filtro no vuelve a "Todas" (= ' + ui.filtroVuelta + ')');
+    if (!ui.steps.includes('filtro-chip-activo: ok')) failures.push('el chip activo del filtro no se marca');
+    if (!ui.steps.includes('direccion-cambia-texto: ok')) failures.push('el boton de direccion no cambia el texto');
+    if (!ui.steps.includes('direccion-cambia-unidad: ok')) failures.push('la unidad del monto no cambia al invertir');
+    if (!ui.steps.includes('direccion-cambia-prefijo: ok')) failures.push('el prefijo Bs. no desaparece al invertir');
+    if (!ui.steps.includes('direccion-cambia-resultado: ok')) failures.push('el resultado no cambia al invertir');
+    if (!ui.steps.includes('tarjeta-selecciona-tasa: ok')) failures.push('click en la tarjeta no elige la tasa');
 
 
     // Verificar que el archivo JSON existe en disco

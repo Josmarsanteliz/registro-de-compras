@@ -166,6 +166,17 @@ escape válido: la barra se pierde y el regex llega a la página como `/D/g`, qu
 nada. Hay que escribir `\\D`. Pasa igual con cualquier `\\`. Si una aserción falla por
 cuestiones de formato raro, sospechá de esto primero.
 
+### Trampa: `ok()` sin `failures.push()` no hace fallar el smoke
+
+`ok('nombre', cond)` solo anota `FALLO` en `out.steps`: el proceso **igual imprime
+`SMOKE_OK`**. Para que una comprobación haga fallar el smoke tiene que estar además en la
+lista `failures` del final. Cuando agregues una comprobación, agregá las dos cosas, o te vas
+a creer que el test pasa cuando en realidad no miró nada.
+
+Relacionado: `$` es `querySelector` (un elemento) y `$$` es `querySelectorAll` (una lista).
+Escribir `$('...').length` devuelve `undefined` **en silencio**, y la aserción falla sin que
+nadie entienda por qué.
+
 ## Seguridad
 
 - `webPreferences`: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`.

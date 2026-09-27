@@ -10,6 +10,8 @@ const state = {
   mercado: null,
   mercadoHistorial: [],
   mercadoError: null,
+  filtroMercado: 'todas',
+  tasaInvertida: false,
   activeTab: 'Todo',
   filters: { q: '', categoria: '', exchange: '', desde: '', hasta: '' },
   editingId: null,
@@ -548,7 +550,7 @@ function tarjetaTasa(def, referencia) {
   const dif = def.key === 'bcv' ? null : diferenciaPct(t.valor, referencia);
   const difTxt = dif === null ? '' :
     `<span class="mc-dif ${dif >= 0 ? 'sube' : 'baja'}">${dif >= 0 ? '+' : ''}${fmtNum(dif)}% vs BCV</span>`;
-  return `<div class="mercado-card ${viejo ? 'viejo' : ''}">
+  return `<div class="mercado-card ${viejo ? 'viejo' : ''}" data-usar-tasa="${def.key}" title="Usar esta tasa en el convertidor">
     <div class="mc-nombre">${esc(def.nombre)}</div>
     <div class="mc-valor">Bs. <b>${fmtNum(t.valor)}</b></div>
     <div class="mc-meta">
@@ -557,7 +559,17 @@ function tarjetaTasa(def, referencia) {
     </div>
     ${viejo ? `<div class="mc-aviso">⏳ Tiene ${horas >= 48 ? Math.floor(horas / 24) + ' días' : horas + ' h'} sin actualizarse</div>` : ''}
     ${difTxt}
+    <div class="mc-usar">usar en el convertidor</div>
   </div>`;
+}
+
+// La tasa elegida en el convertidor, ya resuelta a su tarjeta.
+function tasaElegida() {
+  const d = state.mercado;
+  const key = $('#cv-tasa').value;
+  const def = ETIQUETAS_TASA.find((x) => x.key === key);
+  if (!def || !d || !d[key] || !(d[key].valor > 0)) return null;
+  return { def, tasa: d[key] };
 }
 
 function renderMercado() {
@@ -572,10 +584,14 @@ function renderMercado() {
     errBox.classList.add('hidden');
   }
 
+  // El filtro solo oculta tarjetas: no cambia la tasa del convertidor.
+  const visibles = ETIQUETAS_TASA.filter((x) => state.filtroMercado === 'todas' || x.moneda === state.filtroMercado);
   if (!d) {
     $('#mercado-actual').innerHTML = '<div class="cal-empty">Todavía no hay tasas consultadas. Tocá "Actualizar ahora".</div>';
+  } else if (!visibles.length) {
+    $('#mercado-actual').innerHTML = '<div class="cal-empty">No hay tasas de esa moneda.</div>';
   } else {
-    $('#mercado-actual').innerHTML = ETIQUETAS_TASA.map((x) => tarjetaTasa(x, ref)).join('');
+    $('#mercado-actual').innerHTML = visibles.map((x) => tarjetaTasa(x, ref)).join('');
   }
 
   // Selector del convertidor
@@ -586,6 +602,10 @@ function renderMercado() {
     .map((x) => `<option value="${x.key}">${esc(x.nombre)} — Bs. ${fmtNum(d[x.key].valor)}</option>`)
     .join('') || '<option value="">Sin tasas disponibles</option>';
   sel.value = ETIQUETAS_TASA.some((x) => x.key === previa) ? previa : sel.value;
+
+  for (const b of $$('#mercado-filtro .chip-btn')) {
+    b.classList.toggle('active', b.dataset.filtro === state.filtroMercado);
+  }
 
   renderMercadoHistorial();
   actualizarConversion();
@@ -615,25 +635,44 @@ function renderMercadoHistorial() {
 
 function actualizarConversion() {
   const out = $('#cv-resultado');
+  const unidad = $('#cv-unidad');
+  const prefijo = $('#cv-prefijo');
+  const boton = $('#cv-cambiar');
+  const detalle = $('#cv-detalle');
+  const elegida = tasaElegida();
   const monto = num($('#cv-monto').value);
-  const key = $('#cv-tasa').value;
-  const def = ETIQUETAS_TASA.find((x) => x.key === key);
-  const t = state.mercado && key ? state.mercado[key] : null;
-  if (!def || !t || !(t.valor > 0)) {
+
+  // El botón dice siempre qué va a pasar al apretarlo, y las unidades acompañan la dirección.
+  boton.textContent = state.tasaInvertida ? '⇅ Bs → divisa' : '⇅ divisa → Bs';
+  boton.title = state.tasaInvertida
+    ? 'Ahora converts Bs a la divisa. Clic para volver a convertir divisa a Bs.'
+    : 'Ahora converts la divisa a Bs. Clic para convertir Bs a la divisa.';
+
+  if (!elegida) {
+    unidad.textContent = '—';
+    prefijo.textContent = '';
     out.textContent = '—';
+    detalle.textContent = 'No hay ninguna tasa consultada todavía.';
     return;
   }
+
+  const { def, tasa } = elegida;
+  unidad.textContent = state.tasaInvertida ? 'Bs' : def.moneda;
+  prefijo.textContent = state.tasaInvertida ? '' : 'Bs.';
+  detalle.innerHTML = `1 ${def.moneda} = Bs. ${fmtNum(tasa.valor)} · ${esc(tasa.fuente)}${tasa.fecha ? ' · ' + fmtDate(tasa.fecha) : ''}`;
+
   if (!(monto > 0)) {
     out.textContent = '—';
     return;
   }
-  if ($('#cv-invertir').checked) {
-    const div = convertir(monto, 1 / t.valor);
-    out.innerHTML = `<b>${fmtNum(div)}</b> ${def.moneda}`;
-  } else {
-    const bs = convertir(monto, t.valor);
-    out.innerHTML = `Bs. <b>${fmtNum(bs)}</b>`;
-  }
+  out.textContent = state.tasaInvertida
+    ? fmtNum(convertir(monto, 1 / tasa.valor)) + ' ' + def.moneda
+    : fmtNum(convertir(monto, tasa.valor));
+}
+
+function cambiarDireccion() {
+  state.tasaInvertida = !state.tasaInvertida;
+  actualizarConversion();
 }
 
 async function cargarMercado() {
@@ -1673,10 +1712,25 @@ function bindEvents() {
 
   // Tasas de mercado
   $('#mercado-refresh').addEventListener('click', refrescarMercado);
-  for (const sel of ['#cv-monto', '#cv-tasa', '#cv-invertir']) {
+  $('#cv-cambiar').addEventListener('click', cambiarDireccion);
+  for (const sel of ['#cv-monto', '#cv-tasa']) {
     $(sel).addEventListener('input', actualizarConversion);
     $(sel).addEventListener('change', actualizarConversion);
   }
+  $('#mercado-filtro').addEventListener('click', (e) => {
+    const b = e.target.closest('.chip-btn');
+    if (!b) return;
+    state.filtroMercado = b.dataset.filtro;
+    renderMercado();
+  });
+  // Clic en una tarjeta: usar esa tasa en el convertidor.
+  $('#mercado-actual').addEventListener('click', (e) => {
+    const c = e.target.closest('[data-usar-tasa]');
+    if (!c) return;
+    $('#cv-tasa').value = c.dataset.usarTasa;
+    actualizarConversion();
+    $('.convertidor').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
 
   // Tasa BCV: refresco y errores que llegan desde el proceso principal
   $('#tasa-refresh').addEventListener('click', async (e) => {

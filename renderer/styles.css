@@ -843,29 +843,137 @@ tr.is-conv:hover td { color: var(--text); }
 .mc-dif.sube { background: rgba(104, 185, 122, 0.16); color: var(--ok-soft); }
 .mc-dif.baja { background: rgba(229, 72, 77, 0.16); color: var(--danger-soft); }
 
-/* Convertidor */
-.convertidor { margin-top: 18px; }
-.convertidor h3 { font-size: 14px; margin-bottom: 12px; }
-.conv-fila {
-  display: grid;
-  grid-template-columns: 150px minmax(210px, 1fr) auto minmax(190px, 1fr);
-  gap: 13px;
-  align-items: end;
-}
-.conv-fila .field.check { padding-top: 0; }
+/* Convertidor: columna, monto arriba y resultado abajo (grid 1 a 1) */
+.convertidor { margin-top: 16px; max-width: 520px; }
+.convertidor h3 { font-size: 14px; margin-bottom: 14px; }
 
-.cv-resultado {
-  background: var(--bg2);
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-size: 17px;
-  color: var(--silver);
-  box-shadow: var(--neu-in-sm);
-  min-height: 40px;
+.cv-stack { display: flex; flex-direction: column; gap: 12px; }
+
+.cv-bloque { display: flex; flex-direction: column; gap: 6px; }
+.cv-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* Las dos cajas miden lo mismo: 1 a 1 */
+.cv-caja {
   display: flex;
   align-items: center;
+  gap: 10px;
+  background: var(--bg2);
+  border-radius: 14px;
+  padding: 6px 14px;
+  box-shadow: var(--neu-in);
+  min-height: 56px;
 }
-.cv-resultado b { color: var(--paprika); font-size: 19px; }
+.cv-input {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--floral);
+  padding: 6px 0;
+  min-width: 0;
+}
+.cv-input:focus { box-shadow: none; border-color: transparent; }
+.cv-input::-webkit-outer-spin-button,
+.cv-input::-webkit-inner-spin-button { opacity: 0.35; }
+
+.cv-unidad {
+  flex: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--silver);
+  background: var(--card);
+  border-radius: 999px;
+  padding: 5px 13px;
+  box-shadow: var(--neu-out-sm);
+}
+
+/* Botón de dirección: grande, y dice qué va a pasar */
+.cv-dir {
+  align-self: center;
+  background: var(--card);
+  color: var(--silver);
+  border: none;
+  border-radius: 999px;
+  padding: 11px 26px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--neu-out);
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.cv-dir:hover {
+  color: var(--paprika);
+  transform: translateY(-1px);
+  box-shadow: var(--neu-out), 0 0 0 1px rgba(235, 94, 40, 0.35);
+}
+.cv-dir:active { transform: translateY(0); box-shadow: var(--neu-in-sm); }
+
+/* Caja de resultado: el número manda */
+.cv-out { box-shadow: var(--neu-in), inset 0 0 0 1px rgba(235, 94, 40, 0.16); }
+.cv-prefijo { font-size: 14px; color: var(--muted); flex: none; }
+.cv-valor {
+  font-size: 25px;
+  font-weight: 700;
+  color: var(--paprika);
+  line-height: 1.2;
+  word-break: break-all;
+}
+
+.cv-detalle { font-size: 12px; margin: 0; }
+
+/* Filtro de las tarjetas de tasa */
+.mercado-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.mercado-sub .sub-titulo { margin: 0; }
+
+.filtro-chips { display: flex; gap: 7px; }
+.chip-btn {
+  background: var(--card);
+  color: var(--muted);
+  border: none;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--neu-out-sm);
+  transition: all 0.15s ease;
+}
+.chip-btn:hover { color: var(--floral); }
+.chip-btn.active {
+  background: linear-gradient(135deg, var(--paprika), #d64f1c);
+  color: #fffcf2;
+  box-shadow: var(--neu-out-sm), 0 0 0 1px rgba(235, 94, 40, 0.5);
+}
+
+/* Las tarjetas son clicables: usar esa tasa en el convertidor */
+.mercado-card { cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.mercado-card:hover { transform: translateY(-2px); }
+.mc-usar {
+  margin-top: 10px;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.mercado-card:hover .mc-usar { opacity: 1; color: var(--paprika); }
 
 .mercado-historial { max-height: 260px; overflow-y: auto; }
 .mercado-historial table { box-shadow: none; background: transparent; }

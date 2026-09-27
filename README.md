@@ -76,8 +76,17 @@ Además, en el **paralelo y los euros** te muestra **cuánto están por encima d
 porcentaje. Ese número es la "prima" que en Venezuela casi siempre existe, y es justo lo que
 necesitás para saber a qué cotiza de verdad el USDT.
 
-**Convertidor:** escribís un monto, elegís con qué tasa, y te dice el resultado en Bs. Con la
-casilla *Calcular al revés* hacés Bs → divisa. Es solo un cálculo, no guarda nada.
+**Convertidor:** arriba escribís el monto y abajo te da el resultado, en dos cajas del mismo
+tamaño. El botón redondo **⇅** cambia la dirección y dice en el mismo botón lo que va a pasar
+(`divisa → Bs` o `Bs → divisa`); la unidad del monto se ajusta sola, porque se deduce de la
+tasa que elegiste. Es solo un cálculo, no guarda nada.
+
+**Filtro:** encima de las tarjetas hay tres botones, **Todas / USD / EUR**, para ver solo las
+que te interesan. Como el euro oficial suele ir atrasado, filtrar por `EUR` es la forma rápida
+de comparar el oficial con el paralelo sin que te distraiga el dólar. El filtro solo oculta
+tarjetas: no cambia la tasa que está usando el convertidor.
+
+**Clic en una tarjeta** para usar esa tasa en el convertidor, sin abrir el desplegable.
 
 Se actualiza sola al abrir la app, tiene **Actualizar ahora** cuando la quieras, y guarda el
 historial de las últimas consultas en una tabla con las cuatro columnas.

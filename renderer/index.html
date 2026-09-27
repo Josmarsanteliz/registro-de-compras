@@ -84,30 +84,46 @@
         <p class="muted">Tasas de cambio de hoy. Cada tarjeta muestra su fuente y su fecha: si un dato tiene más de 24 horas, te lo aviso en vez de presentarlo como nuevo.</p>
         <button id="mercado-refresh" class="btn">↻ Actualizar ahora</button>
       </div>
-      <div id="mercado-actual" class="mercado-grid"></div>
       <div id="mercado-error" class="error hidden"></div>
 
       <div class="convertidor card">
         <h3>Convertidor</h3>
-        <div class="conv-fila">
+        <div class="cv-stack">
+          <div class="cv-bloque">
+            <div class="cv-label">Monto</div>
+            <div class="cv-caja">
+              <input type="number" id="cv-monto" class="input cv-input" step="any" min="0" placeholder="1000">
+              <span id="cv-unidad" class="cv-unidad">USD</span>
+            </div>
+          </div>
+
+          <button type="button" id="cv-cambiar" class="cv-dir">⇅ divisa → Bs</button>
+
+          <div class="cv-bloque">
+            <div class="cv-label">Resultado</div>
+            <div class="cv-caja cv-out">
+              <span class="cv-prefijo" id="cv-prefijo">Bs.</span>
+              <span class="cv-valor" id="cv-resultado">—</span>
+            </div>
+          </div>
+
           <label class="field">
-            <span>Monto</span>
-            <input type="number" id="cv-monto" class="input" step="any" min="0" placeholder="100">
-          </label>
-          <label class="field">
-            <span>Usando la tasa</span>
+            <span>Tasa que se usa</span>
             <select id="cv-tasa" class="input"></select>
           </label>
-          <label class="field check">
-            <input type="checkbox" id="cv-invertir">
-            <span>Calcular al revés (Bs → divisa)</span>
-          </label>
-          <div class="field">
-            <span>Resultado</span>
-            <div id="cv-resultado" class="cv-resultado">—</div>
-          </div>
+          <p id="cv-detalle" class="muted cv-detalle"></p>
         </div>
       </div>
+
+      <div class="mercado-sub">
+        <h3 class="sub-titulo">Tasas de hoy</h3>
+        <div id="mercado-filtro" class="filtro-chips">
+          <button class="chip-btn active" data-filtro="todas">Todas</button>
+          <button class="chip-btn" data-filtro="USD">USD</button>
+          <button class="chip-btn" data-filtro="EUR">EUR</button>
+        </div>
+      </div>
+      <div id="mercado-actual" class="mercado-grid"></div>
 
       <h3 class="sub-titulo">Historial</h3>
       <div id="mercado-historial" class="mercado-historial"></div>

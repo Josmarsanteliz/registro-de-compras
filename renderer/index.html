@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file:;">
+  <title>Registro de Compras</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ============ PANTALLA PRINCIPAL ============ -->
+  <section id="screen-app" class="screen">
+    <header>
+      <div class="brand"><img class="brand-logo" src="assets/logo.png" alt="Logo"><b>Registro de Compras</b></div>
+      <nav class="tabs" id="tabs"></nav>
+      <div class="header-actions">
+        <button id="btn-new" class="btn primary">+ Nuevo registro</button>
+        <div class="menu">
+          <button id="btn-menu" class="btn">☰ Menú</button>
+          <div id="menu-drop" class="menu-drop hidden">
+            <button data-action="export">💾 Exportar respaldo</button>
+            <button data-action="import">📥 Importar respaldo</button>
+            <button data-action="csv">📄 Exportar CSV</button>
+            <button data-action="settings">🏦 Tasa del BCV</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div id="totals" class="totals"></div>
+
+    <div class="filters">
+      <input type="search" id="f-q" class="input" placeholder="Buscar…">
+      <select id="f-categoria" class="input"><option value="">Todas las categorías</option></select>
+      <select id="f-exchange" class="input"><option value="">Todos los exchange</option></select>
+      <input type="date" id="f-desde" class="input" title="Desde">
+      <input type="date" id="f-hasta" class="input" title="Hasta">
+      <button id="f-clear" class="btn ghost" title="Limpiar filtros">✕</button>
+    </div>
+
+    <div id="table-wrap" class="table-wrap">
+      <table id="table">
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div id="empty" class="empty hidden"></div>
+    </div>
+
+    <!-- ============ VISTA: CALENDARIO ============ -->
+    <section id="view-calendar" class="calendar-view hidden">
+      <div class="cal-head">
+        <button id="cal-prev" class="btn ghost" title="Mes anterior">‹</button>
+        <div id="cal-title" class="cal-title"></div>
+        <button id="cal-next" class="btn ghost" title="Mes siguiente">›</button>
+        <button id="cal-today" class="btn">Hoy</button>
+        <button id="cal-jump" class="btn small hidden">Ver en la lista 📋</button>
+      </div>
+      <div id="cal-grid" class="cal-grid"></div>
+      <div class="cal-legend">
+        <span><span class="dot ing"></span> Ingreso</span>
+        <span><span class="dot egr"></span> Egreso</span>
+        <span><span class="dot conv"></span> Conversión</span>
+        <span><span class="dot loan"></span> Vence préstamo</span>
+        <span class="muted">Clic en un día para resaltarlo y verlo en la lista</span>
+      </div>
+      <div id="cal-notes" class="cal-notes"></div>
+    </section>
+
+    <!-- ============ VISTA: PRÉSTAMOS ============ -->
+    <section id="view-loans" class="loans-view hidden">
+      <div id="loan-totals" class="totals"></div>
+      <div class="table-wrap">
+        <table id="loan-table">
+          <thead id="loan-thead"></thead>
+          <tbody id="loan-tbody"></tbody>
+        </table>
+        <div id="loan-empty" class="empty hidden"></div>
+      </div>
+    </section>
+
+    <!-- ============ VISTA: CARTERA ============ -->
+    <section id="view-cartera" class="cartera-view hidden">
+      <div id="cartera-totals" class="totals"></div>
+      <div id="cartera-grid" class="cartera-grid"></div>
+      <p id="cartera-nota" class="muted cartera-nota"></p>
+    </section>
+  </section>
+
+  <!-- ============ MODAL: FORMULARIO ============ -->
+  <div id="modal-form" class="overlay hidden">
+    <div class="modal">
+      <h2 id="form-title">Nuevo registro</h2>
+      <form id="record-form" autocomplete="off">
+        <div class="grid">
+          <label class="field">
+            <span>Fecha *</span>
+            <input type="date" id="f-fecha" class="input" required>
+          </label>
+          <label class="field">
+            <span>Moneda *</span>
+            <select id="f-moneda" class="input">
+              <option value="Bs">Bs</option>
+              <option value="USDT">USDT</option>
+              <option value="USD">USD</option>
+              <option value="BTC">BTC</option>
+            </select>
+          </label>
+          <div id="conv-fields" class="conv-fields hidden">
+            <label class="field">
+              <span>Entrego (lo que sale)</span>
+              <select id="f-conv-moneda" class="input">
+                <option value="USDT">USDT</option>
+                <option value="BTC">BTC</option>
+                <option value="USD">USD</option>
+                <option value="Bs">Bs</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Monto entregado *</span>
+              <input type="number" id="f-conv-monto" class="input" step="any" min="0" placeholder="0.00">
+            </label>
+            <label class="field span2">
+              <span>Precio unitario (por 1 de la moneda recibida)</span>
+              <input type="number" id="f-conv-precio" class="input" step="any" min="0" placeholder="Se calcula solo">
+            </label>
+            <p id="conv-calc" class="conv-calc"></p>
+          </div>
+          <label class="field span2">
+            <span>Concepto *</span>
+            <input type="text" id="f-concepto" class="input" placeholder="Ej: compra de USDT, mercado, luz…" required>
+          </label>
+          <div class="field span2">
+            <span>Tipo *</span>
+            <div class="tipo-toggle">
+              <label class="tipo-opt">
+                <input type="radio" name="tipo" value="Egreso" checked>
+                <span>🔴 Egreso (gasto)</span>
+              </label>
+              <label class="tipo-opt">
+                <input type="radio" name="tipo" value="Ingreso">
+                <span>🟢 Ingreso (entrada)</span>
+              </label>
+              <label class="tipo-opt">
+                <input type="radio" name="tipo" value="Conversión">
+                <span>↔ Conversión (swap)</span>
+              </label>
+            </div>
+          </div>
+          <p id="conv-help" class="conv-help hidden">Una conversión mueve valor de una moneda a otra: <b>no es gasto ni ingreso</b>, por eso no altera el total en Bs.</p>
+          <label class="field">
+            <span>Categoría</span>
+            <input type="text" id="f-categoria" class="input" list="cat-list" placeholder="Ej: crypto, comida, servicios">
+            <datalist id="cat-list"></datalist>
+          </label>
+          <label class="field">
+            <span>Monto *</span>
+            <input type="number" id="f-monto" class="input" step="any" min="0" placeholder="0.00" required>
+          </label>
+          <label class="field">
+            <span>Tasa del día (Bs)</span>
+            <div class="input-row">
+              <input type="number" id="f-tasa" class="input" step="any" min="0" placeholder="Opcional">
+              <button type="button" id="f-tasa-bcv" class="btn small" title="Consultar la tasa oficial del BCV">↻ BCV</button>
+            </div>
+          </label>
+          <label class="field">
+            <span>Exchange destino</span>
+            <select id="f-exchange-form" class="input">
+              <option value="Ninguno">Ninguno</option>
+              <option value="Binance">Binance</option>
+              <option value="Bybit">Bybit</option>
+              <option value="OKX">OKX</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Precio de compra</span>
+            <input type="number" id="f-precio" class="input" step="any" min="0" placeholder="Ej: precio del BTC en USDT">
+          </label>
+          <label class="field">
+            <span>Bs involucrados</span>
+            <input type="number" id="f-bs" class="input" step="any" min="0" placeholder="Opcional">
+          </label>
+          <label class="field check">
+            <input type="checkbox" id="f-spot">
+            <span>¿Compra por spot?</span>
+          </label>
+          <label class="field span2">
+            <span>Se origina de (cadena)</span>
+            <select id="f-origen" class="input">
+              <option value="">— Sin origen —</option>
+            </select>
+          </label>
+          <label class="field span2">
+            <span>Notas</span>
+            <textarea id="f-notas" class="input" rows="2" placeholder="Opcional"></textarea>
+          </label>
+        </div>
+        <div id="form-error" class="error hidden"></div>
+        <div class="modal-actions">
+          <button type="button" id="form-cancel" class="btn ghost">Cancelar</button>
+          <button type="submit" class="btn primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: DETALLE ============ -->
+  <div id="modal-detail" class="overlay hidden">
+    <div class="modal">
+      <h2>Detalle</h2>
+      <div id="detail-body"></div>
+      <div class="modal-actions">
+        <button id="detail-close" class="btn ghost">Cerrar</button>
+        <button id="detail-edit" class="btn">Editar</button>
+        <button id="detail-delete" class="btn danger">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: TASA BCV ============ -->
+  <div id="modal-settings" class="overlay hidden">
+    <div class="modal">
+      <h2>Tasa del BCV</h2>
+      <p class="muted">La tasa oficial se consulta sola al abrir la app. Se usa para calcular el total en Bs de los registros y préstamos que no tienen tasa propia.</p>
+
+      <div id="tasa-actual" class="tasa-actual"></div>
+      <div id="tasa-error" class="error hidden"></div>
+
+      <div class="tasa-acciones">
+        <button id="tasa-refresh" class="btn">↻ Consultar ahora</button>
+        <select id="set-fuente" class="input" title="Si eliges Manual, la app deja de actualizar la tasa sola">
+          <option value="BCV">Automática (BCV)</option>
+          <option value="Manual">Manual (no tocar)</option>
+        </select>
+      </div>
+
+      <label class="field">
+        <span>Tasa BCV (Bs por 1 USD)</span>
+        <input type="number" id="set-tasa" class="input" step="any" min="0" placeholder="Ej: 857.00">
+      </label>
+
+      <h3 class="sub-titulo">Historial</h3>
+      <div id="tasa-historial" class="tasa-historial"></div>
+
+      <div class="modal-actions">
+        <button id="settings-cancel" class="btn ghost">Cancelar</button>
+        <button id="settings-ok" class="btn primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: NUEVO / EDITAR PRÉSTAMO ============ -->
+  <div id="modal-loan" class="overlay hidden">
+    <div class="modal">
+      <h2 id="loan-title">Nuevo préstamo</h2>
+      <form id="loan-form" autocomplete="off">
+        <div class="grid">
+          <label class="field">
+            <span>Monto recibido (USD) *</span>
+            <input type="number" id="l-monto" class="input" step="any" min="0" placeholder="60" required>
+          </label>
+          <label class="field">
+            <span>Fecha del préstamo *</span>
+            <input type="date" id="l-fecha" class="input" required>
+          </label>
+          <label class="field">
+            <span>Plazo (días)</span>
+            <input type="number" id="l-dias" class="input" step="1" min="1" value="14">
+          </label>
+          <label class="field">
+            <span>Interés (%)</span>
+            <input type="number" id="l-interes" class="input" step="any" min="0" value="10">
+          </label>
+          <label class="field">
+            <span>Tasa BCV (Bs por 1 USD)</span>
+            <div class="input-row">
+              <input type="number" id="l-tasa" class="input" step="any" min="0" placeholder="Usa la de referencia">
+              <button type="button" id="l-tasa-bcv" class="btn small" title="Consultar la tasa oficial del BCV">↻ BCV</button>
+            </div>
+          </label>
+          <label class="field">
+            <span>¿A quién / referencia</span>
+            <input type="text" id="l-contraparte" class="input" placeholder="Ej: vecino, banco, amigo…">
+          </label>
+          <div class="field span2 loan-calc">
+            <div id="loan-calc" class="loan-calc-box"></div>
+          </div>
+          <label class="field check span2">
+            <input type="checkbox" id="l-gen" checked>
+            <span>Crear registro de <b>Ingreso</b> automáticamente (se encadena al pago)</span>
+          </label>
+          <label class="field span2">
+            <span>Notas</span>
+            <textarea id="l-notas" class="input" rows="2" placeholder="Opcional"></textarea>
+          </label>
+        </div>
+        <div id="loan-error" class="error hidden"></div>
+        <div class="modal-actions">
+          <button type="button" id="loan-cancel" class="btn ghost">Cancelar</button>
+          <button type="submit" class="btn primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: DETALLE PRÉSTAMO ============ -->
+  <div id="modal-loan-detail" class="overlay hidden">
+    <div class="modal">
+      <h2>Detalle del préstamo</h2>
+      <div id="loan-detail-body"></div>
+      <div class="modal-actions">
+        <button id="loan-detail-close" class="btn ghost">Cerrar</button>
+        <button id="loan-detail-edit" class="btn">Editar</button>
+        <button id="loan-detail-pay" class="btn primary">Marcar como pagado</button>
+        <button id="loan-detail-delete" class="btn danger">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

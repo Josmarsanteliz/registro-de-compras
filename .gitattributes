@@ -1,0 +1,13 @@
+# Normaliza finales de línea en el repo (evita ruido de "LF will be replaced by CRLF").
+* text=auto
+
+# Archivos que deben quedar con CRLF sí o sí en Windows.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binarios: git no debe intentar normalizar sus finales de línea.
+*.png binary
+*.jpg binary
+*.jfif binary
+*.ico binary
+*.exe binary

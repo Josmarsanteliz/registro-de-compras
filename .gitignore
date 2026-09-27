@@ -1,0 +1,7 @@
+node_modules/
+datos/
+release/
+*.log
+stdout.txt
+stderr.txt
+launch-debug.log

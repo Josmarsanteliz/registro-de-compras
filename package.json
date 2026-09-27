@@ -1,0 +1,52 @@
+{
+  "name": "registro-compras",
+  "productName": "Registro de Compras",
+  "version": "1.1.0",
+  "description": "Registro personal de compras, conversiones y préstamos en BTC, USDT, USD y Bs, con tasa del BCV automática. 100% local.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.hogar.registrocompras",
+    "productName": "Registro de Compras",
+    "files": [
+      "main.js",
+      "preload.js",
+      "core.js",
+      "bcv.js",
+      "renderer/**/*",
+      "Logo/PNG.png",
+      "Logo/app.ico",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "Logo/app.ico",
+      "signExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Registro de Compras",
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "Registro-de-Compras-Setup.exe"
+    }
+  }
+}

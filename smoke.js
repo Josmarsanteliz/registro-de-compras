@@ -51,7 +51,7 @@ app.whenReady().then(async () => {
       await sleep(200);
       ok('no-pin-screen', !document.getElementById('screen-pin'));
       ok('app-visible', !$('#screen-app').classList.contains('hidden'));
-      ok('tabs-8', $('#tabs').children.length === 8);
+      ok('tabs-9', $('#tabs').children.length === 9);
       ok('empty-state', !$('#empty').classList.contains('hidden'));
       const pre = await window.api.getRecords();
       out.initialRecords = pre.records.map(function (r) { return r.moneda + '/' + r.tipo + '/' + r.concepto; });
@@ -352,6 +352,68 @@ app.whenReady().then(async () => {
       out.loanBadgeText = ($('#loan-tbody .loan-badge') || {}).textContent || '';
       ok('loan-badge-paid', out.loanBadgeText.includes('Pagado'));
 
+      // 13b) Pestaña Tasas: tarjetas, convertidor e historial.
+      // Se usa el botón "Actualizar ahora" de la app, que es el camino real del usuario.
+      await run('13b-tasas', async () => {
+        const tab = $('#tabs .tab[data-tab="Tasas"]');
+        if (tab) tab.click();
+        await sleep(150);
+        const v = $('#view-tasas');
+        out.tasasVisible = !v.classList.contains('hidden') && v.getBoundingClientRect().height > 0;
+
+        // La consulta de red puede tardar: se espera a que el botón se vuelva a habilitar.
+        const btn = $('#mercado-refresh');
+        btn.click();
+        for (let i = 0; i < 60 && btn.disabled; i++) await sleep(500);
+        await sleep(250);
+
+        out.mercadoHandlerOk = ((await window.api.getMercado()) || {}).ok === true;
+        out.mercadoCards = $$('#mercado-actual .mercado-card').length;
+        out.mercadoConValor = $$('#mercado-actual .mercado-card .mc-valor b').length;
+        out.cvOpciones = $$('#cv-tasa option').length;
+        out.histFilas = $$('#mercado-historial tbody tr').length;
+        out.estadoVacio = $$('#mercado-actual .cal-empty').length;
+        out.mercadoOnline = out.mercadoConValor > 0;
+
+        out.cvResultado = '';
+        out.cvInvertido = '';
+        if (out.mercadoOnline) {
+          // El valor esperado sale de la propia tarjeta del BCV, para no depender de la red.
+          const valorTxt = $$('#mercado-actual .mercado-card .mc-valor b')[0].textContent.replace(/\\D/g, '');
+          out.cvEsperado = valorTxt;
+          $('#cv-monto').value = 100;
+          $('#cv-tasa').value = 'bcv';
+          $('#cv-monto').dispatchEvent(new Event('input', { bubbles: true }));
+          $('#cv-tasa').dispatchEvent(new Event('change', { bubbles: true }));
+          await sleep(120);
+          out.cvResultado = ($('#cv-resultado') || {}).textContent || '';
+          $('#cv-invertir').checked = true;
+          $('#cv-monto').dispatchEvent(new Event('input', { bubbles: true }));
+          $('#cv-invertir').dispatchEvent(new Event('change', { bubbles: true }));
+          await sleep(120);
+          out.cvInvertido = ($('#cv-resultado') || {}).textContent || '';
+          $('#cv-invertir').checked = false;
+        }
+
+        ok('mercado-handler', out.mercadoHandlerOk === true);
+        ok('tasas-visible', out.tasasVisible === true);
+        if (out.mercadoOnline) {
+          ok('tasas-4-tarjetas', out.mercadoCards === 4);
+          ok('tasas-convertidor-opciones', out.cvOpciones >= 1);
+          // 100 USD al BCV debe empezar por el mismo prefijo que el valor de la tarjeta (x100).
+          ok('tasas-conversion-100usd', out.cvResultado.replace(/\\D/g, '').startsWith(out.cvEsperado));
+          ok('tasas-conversion-invertida', /USD/.test(out.cvInvertido));
+          ok('tasas-historial', out.histFilas >= 1);
+        } else {
+          // Sin internet: la vista debe explicar que no hay tasas, no romperse.
+          ok('tasas-estado-vacio', out.estadoVacio === 1 && out.mercadoConValor === 0);
+        }
+
+        const todo = $('#tabs .tab[data-tab="Todo"]');
+        if (todo) todo.click();
+        await sleep(60);
+      });
+
       // 14) Persistencia real en disco (JSON plano)
       await run('14-persistence', async () => {
         const recs = await window.api.getRecords();
@@ -366,12 +428,13 @@ app.whenReady().then(async () => {
 
     console.log('SMOKE_STEPS');
     for (const s of ui.steps) console.log('  ' + s);
+    function out0(v) { return v === undefined ? "(sin dato)" : v; }
     console.log('SMOKE_RESULT ' + JSON.stringify({ ...ui, steps: undefined }, null, 2));
 
     const failures = [];
     if (!ui.steps.includes('no-pin-screen: ok')) failures.push('sigue habiendo pantalla PIN');
     if (!ui.steps.includes('app-visible: ok')) failures.push('app no visible');
-    if (!ui.steps.includes('tabs-8: ok')) failures.push('tabs != 8');
+    if (!ui.steps.includes('tabs-9: ok')) failures.push('tabs != 9');
     if (!ui.steps.includes('rows-after-first: ok')) failures.push('1er registro no creado');
     if (!ui.steps.includes('rows-after-second: ok')) failures.push('2do registro no creado');
     if (!ui.chainBadges) failures.push('sin badges de cadena');
@@ -412,6 +475,11 @@ app.whenReady().then(async () => {
     if (!ui.loanEgresoOk) failures.push('no se creó el Egreso del pago');
     if (!ui.steps.includes('loan-cal-marker: ok')) failures.push('calendario sin marcador de préstamo');
     if (!ui.steps.includes('loan-cal-note: ok')) failures.push('calendario sin nota de préstamo');
+    if (!ui.steps.includes('tasas-visible: ok')) failures.push('la vista Tasas no se ve');
+    if (!ui.steps.includes('tasas-4-tarjetas: ok')) failures.push('faltan tarjetas en Tasas (= ' + ui.mercadoCards + ')');
+    if (!ui.steps.includes('tasas-conversion-100usd: ok')) failures.push('el convertidor no calcula (= ' + out0(ui.cvResultado) + ')');
+    if (!ui.steps.includes('mercado-handler: ok')) failures.push('el handler de mercado no responde');
+
 
     // Verificar que el archivo JSON existe en disco
     const onDisk = fs.existsSync(path.join(DATA_DIR, 'registro.json'));

@@ -767,6 +767,112 @@ tr.is-conv:hover td { color: var(--text); }
 .tasa-historial tbody tr:hover { background: rgba(255, 252, 242, 0.035); }
 .tasa-tbl { font-size: 13px; }
 
+/* ---------- Vista Tasas de mercado ---------- */
+.tasas-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.tasas-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 15px;
+}
+.tasas-head p { max-width: 620px; line-height: 1.5; }
+.tasas-head .btn { flex: none; }
+
+.mercado-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 13px;
+}
+
+.mercado-card {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 15px 17px;
+  box-shadow: var(--neu-out);
+  border-left: 3px solid var(--accent);
+}
+.mercado-card.vacia { border-left-color: var(--border); }
+.mercado-card.viejo { border-left-color: var(--accent-soft); }
+
+.mc-nombre {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.mc-valor {
+  font-size: 15px;
+  color: var(--silver);
+  margin: 6px 0 4px;
+}
+.mc-valor b {
+  display: block;
+  font-size: 25px;
+  color: var(--paprika);
+  font-weight: 700;
+  line-height: 1.15;
+}
+.mc-meta { font-size: 11px; color: var(--muted); }
+
+.mc-aviso {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--accent-soft);
+  background: rgba(235, 94, 40, 0.1);
+  border-radius: 9px;
+  padding: 4px 8px;
+  display: inline-block;
+}
+
+.mc-dif {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.mc-dif.sube { background: rgba(104, 185, 122, 0.16); color: var(--ok-soft); }
+.mc-dif.baja { background: rgba(229, 72, 77, 0.16); color: var(--danger-soft); }
+
+/* Convertidor */
+.convertidor { margin-top: 18px; }
+.convertidor h3 { font-size: 14px; margin-bottom: 12px; }
+.conv-fila {
+  display: grid;
+  grid-template-columns: 150px minmax(210px, 1fr) auto minmax(190px, 1fr);
+  gap: 13px;
+  align-items: end;
+}
+.conv-fila .field.check { padding-top: 0; }
+
+.cv-resultado {
+  background: var(--bg2);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 17px;
+  color: var(--silver);
+  box-shadow: var(--neu-in-sm);
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+}
+.cv-resultado b { color: var(--paprika); font-size: 19px; }
+
+.mercado-historial { max-height: 260px; overflow-y: auto; }
+.mercado-historial table { box-shadow: none; background: transparent; }
+.mercado-historial thead th { background: transparent; }
+.mercado-historial tbody tr { cursor: default; }
+.mercado-historial tbody tr:hover { background: rgba(255, 252, 242, 0.035); }
+
 /* ---------- Vista Cartera ---------- */
 .cartera-view {
   flex: 1;

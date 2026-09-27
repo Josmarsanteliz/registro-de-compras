@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const core = require('./core');
-const bcv = require('./bcv');
+const mercado = require('./mercado');
 
 const DATA_DIR = app.isPackaged ? path.join(app.getPath('userData'), 'datos') : path.join(__dirname, 'datos');
 const DATA_PATH = path.join(DATA_DIR, 'registro.json');
@@ -13,7 +13,7 @@ const DATA_PATH = path.join(DATA_DIR, 'registro.json');
 const SETTINGS_DEFAULT = { tasaReferencia: 0, tasaFuente: 'BCV', tasaUltimaConsulta: 0, tasaUltimoError: null };
 
 let mainWindow = null;
-let db = { records: [], loans: [], tasas: [], settings: { ...SETTINGS_DEFAULT } };
+let db = { records: [], loans: [], tasas: [], mercado: [], settings: { ...SETTINGS_DEFAULT } };
 
 // Log de diagnóstico (solo actúa si se define REGISTRO_DEBUG=1).
 function dbg(msg) {
@@ -42,10 +42,12 @@ function load() {
       loans: Array.isArray(parsed.loans) ? parsed.loans.map((l) => core.normalizeLoan(l)) : [],
       // Migración: tampoco traen el historial de tasas del BCV.
       tasas: Array.isArray(parsed.tasas) ? parsed.tasas.filter((t) => t && t.valor > 0) : [],
+      // Migración: tampoco traen el historial de mercado (paralelo y euros).
+      mercado: Array.isArray(parsed.mercado) ? parsed.mercado.filter((m) => m && m.fecha) : [],
       settings: { ...SETTINGS_DEFAULT, ...(parsed.settings && typeof parsed.settings === 'object' ? parsed.settings : {}) },
     };
   } catch {
-    db = { records: [], loans: [], tasas: [], settings: { ...SETTINGS_DEFAULT } };
+    db = { records: [], loans: [], tasas: [], mercado: [], settings: { ...SETTINGS_DEFAULT } };
     save();
   }
 }
@@ -83,7 +85,7 @@ function todayISO() {
 function ultimaTasa() {
   const historial = db.tasas;
   const ultima = historial.length ? historial[historial.length - 1] : null;
-  const cache = bcv.getCache();
+  const cache = mercado.getCache();
   if (cache && (!ultima || cache.consultadoEn > (ultima.guardadoEn || 0))) return cache;
   return ultima;
 }
@@ -110,7 +112,7 @@ function guardarTasa(tasa) {
 
 // Consulta las fuentes (BCV y, si falla, DolarAPI) y guarda el resultado.
 async function refrescarTasa() {
-  const res = await bcv.consultar();
+  const res = await mercado.consultar();
   if (res.ok) {
     guardarTasa(res.tasa);
   } else {
@@ -120,6 +122,50 @@ async function refrescarTasa() {
     save();
   }
   return { ...res, historial: db.tasas.slice(-30).reverse(), settings: { ...db.settings } };
+}
+
+/* ---------- Mercado (paralelo y euros) ---------- */
+
+let cacheMercado = null;
+
+// Última consulta conocida: el historial si es más nuevo que la caché de esta sesión.
+function ultimoMercado() {
+  const ultimo = db.mercado.length ? db.mercado[db.mercado.length - 1] : null;
+  if (cacheMercado && (!ultimo || cacheMercado.consultadasEn > (ultimo.guardadoEn || 0))) {
+    return { ...cacheMercado, esCache: true };
+  }
+  return ultimo;
+}
+
+// Una fila por día con las cuatro tasas. Re-consultar el mismo día solo actualiza los valores.
+function guardarMercado(datos) {
+  cacheMercado = datos;
+  const hoy = todayISO();
+  const fila = {
+    fecha: hoy,
+    bcv: datos.bcv ? datos.bcv.valor : null,
+    paralelo: datos.paralelo ? datos.paralelo.valor : null,
+    euroOficial: datos.euroOficial ? datos.euroOficial.valor : null,
+    euroParalelo: datos.euroParalelo ? datos.euroParalelo.valor : null,
+    guardadoEn: Date.now(),
+  };
+  const i = db.mercado.findIndex((m) => m.fecha === hoy);
+  if (i === -1) db.mercado.push(fila);
+  else db.mercado[i] = fila;
+  if (db.mercado.length > 1500) db.mercado.splice(0, db.mercado.length - 1500);
+  save();
+  return datos;
+}
+
+async function refrescarMercado() {
+  const res = await mercado.consultarMercado();
+  const datos = res.ok ? guardarMercado(res.mercado) : ultimoMercado();
+  return {
+    ok: res.ok,
+    mercado: datos,
+    error: res.error,
+    historial: db.mercado.slice(-20).reverse(),
+  };
 }
 
 // Registro (Ingreso al recibir / Egreso al pagar) que nace de un préstamo.
@@ -242,6 +288,14 @@ function registerIpc() {
   });
 
   ipcMain.handle('tasa:refresh', () => refrescarTasa());
+
+  // ---------- Mercado ----------
+
+  ipcMain.handle('mercado:get', () => {
+    return { ok: true, mercado: ultimoMercado(), historial: db.mercado.slice(-20).reverse() };
+  });
+
+  ipcMain.handle('mercado:refresh', () => refrescarMercado());
 
   ipcMain.handle('registro:add', (_e, rec) => {
     const r = core.normalizeRecord(rec);
@@ -405,6 +459,7 @@ function registerIpc() {
     });
     db.loans = Array.isArray(parsed.loans) ? parsed.loans.map((l) => core.normalizeLoan(l)) : [];
     db.tasas = Array.isArray(parsed.tasas) ? parsed.tasas.filter((t) => t && t.valor > 0) : [];
+    db.mercado = Array.isArray(parsed.mercado) ? parsed.mercado.filter((m) => m && m.fecha) : [];
     db.settings = { ...SETTINGS_DEFAULT, ...(parsed.settings && typeof parsed.settings === 'object' ? parsed.settings : {}) };
     // Limpieza: quitar referencias rotas (huérfanas) tras la importación.
     const ids = new Set(db.records.map((r) => r.id));
@@ -458,8 +513,8 @@ if (gotLock && !process.env.REGISTRO_SMOKE) {
   app.whenReady().then(() => {
     dbg('whenReady RESUELTO');
     createWindow();
-    // Consulta la tasa del BCV al abrir, sin bloquear el arranque: si falla, la app abre igual
-    // con la última tasa guardada y el error se muestra en la UI.
+    // Consulta la tasa del BCV y las de mercado al abrir, sin bloquear el arranque: si algo
+    // falla, la app abre igual con lo último guardado y el error se muestra en la UI.
     refrescarTasa()
       .then((r) => {
         dbg('tasa BCV: ' + (r.ok ? r.tasa.valor + ' (' + r.tasa.fuente + ')' : 'falló: ' + r.error));
@@ -468,6 +523,14 @@ if (gotLock && !process.env.REGISTRO_SMOKE) {
         }
       })
       .catch((err) => dbg('tasa BCV excepción: ' + (err && err.message ? err.message : err)));
+    refrescarMercado()
+      .then((r) => {
+        dbg('mercado: ' + (r.ok ? r.mercado.disponible + '/4 tasas' : 'falló: ' + r.error));
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('mercado:actualizado', r);
+        }
+      })
+      .catch((err) => dbg(' mercado excepción: ' + (err && err.message ? err.message : err)));
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });

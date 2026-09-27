@@ -39,17 +39,19 @@ preload.js                                  contextBridge: única puerta a Node
 main.js                                     Ventana, persistencia JSON, IPC, instancia única
         │  require
         ▼
-core.js  +  bcv.js                          Lógica pura (sin Electron, sin I/O)
+core.js  +  mercado.js                      Lógica pura (sin Electron, sin I/O)
 ```
 
 - **`core.js` no puede hacer `require('electron')` ni tocar el disco.** Es lo que permite
   correr `node test-core.js` sin levantar la app. Toda la lógica de negocio y de formato va aquí.
-- **`bcv.js` no puede hacer `require('electron')`.** Solo `https`/`fetch`. Los parsers de
+- **`mercado.js` no puede hacer `require('electron')`.** Solo `https`. Los parsers de
   respuesta son funciones puras y testeables; la capa de red es la única que hace I/O.
+  Trae cuatro tasas de dos fuentes distintas (BCV oficial y DolarAPI), y está documentado
+  más abajo por qué no se puede usar DolarAPI para la tasa oficial.
 - **`main.js`** es dueño del estado: `db = { records, loans, tasas, settings }` y lo persiste
   con `save()` (escritura síncrona a JSON plano).
 - **`preload.js`** expone `window.api`. Si agregas un método ahí, agrégalo también como
-  `ipcMain.handle` en `main.js` y como stub en `core.js`/`bcv.js` si aplica. Nada más.
+  `ipcMain.handle` en `main.js` y como stub en `core.js`/`mercado.js` si aplica. Nada más.
 
 ## ⚠️ La trampa: lógica duplicada en el renderer
 
@@ -100,6 +102,7 @@ Si no imprime nada, el nombre es consistente.
   "records": [ /* movimientos: Ingreso | Egreso | Conversión */ ],
   "loans":   [ /* préstamos con interés fijo */ ],
   "tasas":   [ /* historial BCV: { fecha, valor, fuente, guardadoEn } */ ],
+  "mercado": [ /* una fila por día: { fecha, bcv, paralelo, euroOficial, euroParalelo, guardadoEn } */ ],
   "settings": { "tasaReferencia": 0, "tasaFuente": "BCV", "tasaUltimaConsulta": 0, "tasaUltimoError": null }
 }
 ```
@@ -119,17 +122,49 @@ Reglas que no hay que romper:
   `core.aplicarMovimiento()`, que es la **única** fuente de verdad de los saldos (la usan los
   totales, la tabla y la pestaña Cartera).
 
-## Tasa del BCV
+## Tasa del BCV y mercado
 
-`bcv.js` consulta el BCV oficial (scraping del HTML de `bcv.org.ve`) y, si falla, cae a
-DolarAPI. **El BCV no tiene API pública**: es scraping, así que el parser puede romperse si
-cambian la página. Por eso hay dos fuentes y, si ambas fallan, se conserva la última tasa
-guardada (nunca se deja al usuario sin tasa).
+### Por qué el BCV se lee del HTML y no de DolarAPI
+
+El BCV no publica API pública, así que su tasa se saca del HTML de la portada con un regex. Y
+**DolarAPI no sirve para la tasa oficial**: la devuelve con varios días de atraso (se ha visto
+el oficial del 25 mientras el BCV real ya daba el del 28). Por eso el BCV se lee directo de
+`bcv.org.ve` y de DolarAPI solo se toman el paralelo y los euros.
+
+Cada tasa lleva su `fecha`, y la interfaz **avisa cuando un dato tiene más de 24 horas** en vez
+de presentarlo como si fuera de hoy. No lo quites: es la diferencia entre informar y engañar.
+
+Un resultado parcial es mejor que un error: `consultarMercado()` devuelve las tasas que logró
+traer y deja en `null` las que fallaron.
+
+### Tabla de lo que trae cada fuente
+
+| Tarjeta | Fuente | Endpoint |
+|---|---|---|
+| BCV (oficial) | bcv.org.ve | HTML, bloque `id="dolar"` |
+| Dólar paralelo | DolarAPI | `/v1/dolares/paralelo` |
+| Euro oficial | DolarAPI | `/v1/euros` (el ítem "Euro") |
+| Euro paralelo | DolarAPI | `/v1/euros` (el ítem "Paralelo") |
+
+## La tasa de referencia
+
+Además de la pestaña de mercado, el BCV alimenta la **tasa de referencia** con la que se
+calculan los registros que no traen tasa propia.
 
 - `settings.tasaFuente === 'Manual'` significa que el usuario fijó la tasa a mano: el
   auto-refresh **no** debe pisarla.
-- Los parsers (`parseBcvHtml`, `parseDolarApi`) son puros y están cubiertos por tests con
-  HTML real congelado. Si actualizas uno, actualiza el fixture del test.
+- Los parsers (`parseBcvHtml`, `parseDolarApiLista`) son puros y están cubiertos por tests con
+  HTML y JSON reales congelados. Si actualizas uno, actualiza el fixture del test.
+- `db.tasas` (historial del BCV) y `db.mercado` (una fila por día con las cuatro tasas) son
+  cosas separadas: la tasa del BCV a veces es del día siguiente y mezclarla con el paralelo
+  etiquetaría mal las fechas.
+
+### Trampa: las barras invertidas dentro de `executeJavaScript`
+
+En `smoke.js` el código de la página va dentro de un **template literal**. Ahí `\D` no es un
+escape válido: la barra se pierde y el regex llega a la página como `/D/g`, que no quita
+nada. Hay que escribir `\\D`. Pasa igual con cualquier `\\`. Si una aserción falla por
+cuestiones de formato raro, sospechá de esto primero.
 
 ## Seguridad
 
@@ -142,7 +177,7 @@ guardada (nunca se deja al usuario sin tasa).
 
 ## Verificación (obligatoria antes de dar algo por terminado)
 
-1. Si tocaste `core.js` o `bcv.js`: `node test-core.js` debe pasar **y** debes agregar al menos
+1. Si tocaste `core.js` o `mercado.js`: `node test-core.js` debe pasar **y** debes agregar al menos
    una prueba por cada función nueva. Cero excusas: `test-core.js` es la red de seguridad de
    este proyecto.
 2. Si tocaste `main.js`, `preload.js` o el renderer: `node_modules\.bin\electron.cmd smoke.js`
@@ -154,13 +189,28 @@ sin respaldar** (menú ☰ → Exportar respaldo).
 
 ## Publicar una versión
 
-**El `.exe` nunca se commitea.** Pesa ~97 MB y GitHub rechaza con error cualquier archivo de
+### Tamaño del `.exe`
+
+Electron pesa lo que pesa. Lo que sí se controla:
+
+- `build.electronLanguages: ["es", "en-US"]` quita los otros 53 idiomas: **ahorra ~47 MB**.
+  No lo quites pensando "es solo un archivo de 687 KB": son 48 MB en total.
+- El target `portable` se eliminó a propósito: eran 107 MB de un segundo `.exe` que nadie
+  usaba. Si lo vuelves a agregar, recuerda que `npm run dist` debe ser `--win` **a secas**:
+  pasarle `--win nsis` por consola pisa el `target` del `package.json` y el otro target no se
+  construye.
+- `release\win-unpacked\` es un intermedio de 369 MB que se regenera solo. Bórralo después
+  de compilar.
+- El piso real es el runtime de Electron (~235 MB en el `.exe` principal). Para llegar a 10 MB
+  habría que reescribir la app en otro framework: no vale la pena para una herramienta personal.
+
+**El `.exe` nunca se commitea.** Pesa más de 100 MB y GitHub rechaza con error cualquier archivo de
 más de 100 MB; además git guardaría cada build como un blob nuevo y el clone se pondría más
 lento con cada versión. El `.exe` va como **adjunto de una release de GitHub** (límite 2 GB):
 
 ```bat
 npm.cmd run dist
-gh release create v1.2.0 release\Registro-de-Compras-Setup.exe --generate-notes
+gh release create v1.2.0 "release\Registro-de-Compras-Setup.exe" --generate-notes
 ```
 
 `instalar.bat` descarga siempre de `releases/latest/download/...`, así que no hay que tocar

@@ -1,7 +1,7 @@
 {
   "name": "registro-compras",
   "productName": "Registro de Compras",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Registro personal de compras, conversiones y préstamos en BTC, USDT, USD y Bs, con tasa del BCV automática. 100% local.",
   "main": "main.js",
   "scripts": {
@@ -35,15 +35,16 @@
     },
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        "nsis"
       ],
       "icon": "Logo/app.ico",
       "signExecutable": false
     },
-    "portable": {
-      "artifactName": "Registro-de-Compras-Portable.exe"
-    },
+    "electronLanguages": [
+      "es",
+      "en-US"
+    ],
+    "compression": "maximum",
     "nsis": {
       "oneClick": false,
       "perMachine": false,
@@ -53,7 +54,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Registro de Compras",
       "deleteAppDataOnUninstall": false,
-      "artifactName": "Registro-de-Compras-Setup.exe"
+      "artifactName": "Registro-de-Compras-Setup.exe",
+      "differentialPackage": false
     }
   }
 }

@@ -4,7 +4,7 @@
 
 const assert = require('assert');
 const core = require('./core');
-const bcv = require('./bcv');
+const mercado = require('./mercado');
 
 let passed = 0;
 function t(name, fn) {
@@ -347,7 +347,7 @@ t('un ingreso normal no llena las columnas de conversión', () => {
 });
 
 /* ============================== Tasa BCV ============================== */
-console.log('bcv: parsers');
+console.log('mercado: BCV y DolarAPI');
 // Fragmento real de la portada del BCV (id="dolar" + "Fecha Valor:").
 const HTML_BCV = `
   <div id="dolar" class="col-sm-12 col-xs-12 ">
@@ -360,54 +360,153 @@ const HTML_BCV = `
     Fecha Valor: <span class="date-display-single" content="2026-09-28T00:00:00-04:00">Lunes, 28 Septiembre 2026</span><hr>
   </div>`;
 t('parseBcvHtml saca valor y fecha', () => {
-  assert.deepStrictEqual(bcv.parseBcvHtml(HTML_BCV), { valor: 857.0058, fecha: '2026-09-28', fuente: 'BCV' });
+  assert.deepStrictEqual(mercado.parseBcvHtml(HTML_BCV), { valor: 857.0058, fecha: '2026-09-28', fuente: 'BCV' });
 });
 t('parseBcvHtml acepta decimal con punto', () => {
-  assert.strictEqual(bcv.parseBcvHtml('<div id="dolar"><strong class="strong-tb">36.50</strong></div>').valor, 36.5);
+  assert.strictEqual(mercado.parseBcvHtml('<div id="dolar"><strong class="strong-tb">36.50</strong></div>').valor, 36.5);
 });
 t('parseBcvHtml con milesSeparados', () => {
-  assert.strictEqual(bcv.parseBcvHtml('<div id="dolar"><strong class="strong-tb">1.234,56</strong></div>').valor, 1234.56);
+  assert.strictEqual(mercado.parseBcvHtml('<div id="dolar"><strong class="strong-tb">1.234,56</strong></div>').valor, 1234.56);
 });
 t('parseBcvHtml devuelve null si no está el bloque del dólar', () => {
-  assert.strictEqual(bcv.parseBcvHtml('<html><body>cae el sistema</body></html>'), null);
+  assert.strictEqual(mercado.parseBcvHtml('<html><body>cae el sistema</body></html>'), null);
 });
 t('parseBcvHtml devuelve null con html vacío', () => {
-  assert.strictEqual(bcv.parseBcvHtml(''), null);
+  assert.strictEqual(mercado.parseBcvHtml(''), null);
 });
-t('parseDolarApi lee promedio y fecha', () => {
-  const body = JSON.stringify({ moneda: 'USD', fuente: 'oficial', promedio: 855.6625, fechaActualizacion: '2026-09-25T00:00:00-04:00' });
-  assert.deepStrictEqual(bcv.parseDolarApi(body), { valor: 855.6625, fecha: '2026-09-25', fuente: 'DolarAPI' });
+t('parseDolarApi lee promedio, fecha, nombre y moneda', () => {
+  const body = JSON.stringify({ moneda: 'USD', fuente: 'oficial', nombre: 'Dólar', promedio: 855.6625, fechaActualizacion: '2026-09-25T00:00:00-04:00' });
+  assert.deepStrictEqual(mercado.parseDolarApi(body), {
+    valor: 855.6625, fecha: '2026-09-25', fuente: 'DolarAPI', nombre: 'Dólar', moneda: 'USD',
+  });
 });
 t('parseDolarApi acepta el objeto ya parseado', () => {
-  assert.strictEqual(bcv.parseDolarApi({ promedio: 900, fechaActualizacion: '2026-09-26T10:00:00Z' }).valor, 900);
+  assert.strictEqual(mercado.parseDolarApi({ promedio: 900, fechaActualizacion: '2026-09-26T10:00:00Z' }).valor, 900);
 });
 t('parseDolarApi con json inválido devuelve null', () => {
-  assert.strictEqual(bcv.parseDolarApi('no es json'), null);
+  assert.strictEqual(mercado.parseDolarApi('no es json'), null);
 });
 t('parseDolarApi sin tasa devuelve null', () => {
-  assert.strictEqual(bcv.parseDolarApi(JSON.stringify({ moneda: 'USD' })), null);
+  assert.strictEqual(mercado.parseDolarApi(JSON.stringify({ moneda: 'USD' })), null);
 });
 t('parseEsNum limpia basura', () => {
-  assert.strictEqual(bcv.parseEsNum(' 857,00580000 '), 857.0058);
-  assert.strictEqual(bcv.parseEsNum('1.234,56'), 1234.56);
-  assert.strictEqual(bcv.parseEsNum('abc'), null);
-  assert.strictEqual(bcv.parseEsNum('0'), null);
+  assert.strictEqual(mercado.parseEsNum(' 857,00580000 '), 857.0058);
+  assert.strictEqual(mercado.parseEsNum('1.234,56'), 1234.56);
+  assert.strictEqual(mercado.parseEsNum('abc'), null);
+  assert.strictEqual(mercado.parseEsNum('0'), null);
 });
 t('tasaDeFecha toma la exacta del historial', () => {
   const hist = [{ fecha: '2026-09-25', valor: 855.66 }, { fecha: '2026-09-28', valor: 857.01 }];
-  assert.strictEqual(bcv.tasaDeFecha(hist, '2026-09-28'), 857.01);
+  assert.strictEqual(mercado.tasaDeFecha(hist, '2026-09-28'), 857.01);
 });
 t('tasaDeFecha cae a la tasa vigente si no hay entrada para ese día', () => {
   const hist = [{ fecha: '2026-09-25', valor: 855.66 }, { fecha: '2026-09-28', valor: 857.01 }];
-  assert.strictEqual(bcv.tasaDeFecha(hist, '2026-09-26'), 855.66);
+  assert.strictEqual(mercado.tasaDeFecha(hist, '2026-09-26'), 855.66);
 });
 t('tasaDeFecha nunca usa una tasa futura', () => {
   const hist = [{ fecha: '2026-09-28', valor: 857.01 }];
-  assert.strictEqual(bcv.tasaDeFecha(hist, '2026-09-20'), null);
+  assert.strictEqual(mercado.tasaDeFecha(hist, '2026-09-20'), null);
 });
 t('tasaDeFecha con historial vacío devuelve null', () => {
-  assert.strictEqual(bcv.tasaDeFecha([], '2026-09-28'), null);
-  assert.strictEqual(bcv.tasaDeFecha(null, '2026-09-28'), null);
+  assert.strictEqual(mercado.tasaDeFecha([], '2026-09-28'), null);
+  assert.strictEqual(mercado.tasaDeFecha(null, '2026-09-28'), null);
+});
+
+
+/* ============================== Mercado ============================== */
+console.log('mercado: DolarAPI lista');
+// Respuesta real de https://ve.dolarapi.com/v1/euros
+const JSON_EUROS = JSON.stringify([
+  { moneda: 'EUR', fuente: 'oficial', nombre: 'Euro', compra: null, venta: null, promedio: 972.648677, fechaActualizacion: '2026-09-25T00:00:00-04:00' },
+  { moneda: 'EUR', fuente: 'paralelo', nombre: 'Paralelo', compra: null, venta: null, promedio: 1074.366748, fechaActualizacion: '2026-09-27T04:01:57.900Z' },
+]);
+// Respuesta real de /v1/dolares/paralelo (objeto suelto)
+const JSON_PARALELO = JSON.stringify({ moneda: 'USD', fuente: 'paralelo', nombre: 'Paralelo', compra: null, venta: null, promedio: 943.891353, fechaActualizacion: '2026-09-27T04:01:57.888Z' });
+
+t('parseDolarApiLista lee la lista de euros', () => {
+  const l = mercado.parseDolarApiLista(JSON_EUROS);
+  assert.strictEqual(l.length, 2);
+  assert.strictEqual(l[0].valor, 972.648677);
+  assert.strictEqual(l[0].fecha, '2026-09-25');
+  assert.strictEqual(l[1].valor, 1074.366748);
+  assert.strictEqual(l[1].nombre, 'Paralelo');
+});
+t('parseDolarApiLista acepta un objeto suelto', () => {
+  const l = mercado.parseDolarApiLista(JSON_PARALELO);
+  assert.strictEqual(l.length, 1);
+  assert.strictEqual(l[0].valor, 943.891353);
+  assert.strictEqual(l[0].fecha, '2026-09-27');
+});
+t('parseDolarApiLista con json inválido devuelve null', () => {
+  assert.strictEqual(mercado.parseDolarApiLista('no es json'), null);
+});
+t('parseDolarApiLista sin promedio utilizable devuelve null', () => {
+  assert.strictEqual(mercado.parseDolarApiLista(JSON.stringify([{ moneda: 'EUR' }])), null);
+  assert.strictEqual(mercado.parseDolarApiLista(JSON.stringify([])), null);
+});
+t('parseDolarApi (objeto) sigue funcionando', () => {
+  assert.strictEqual(mercado.parseDolarApi(JSON_PARALELO).valor, 943.891353);
+  assert.strictEqual(mercado.parseDolarApi('nope'), null);
+});
+t('isoFecha descarta fechas invalidas', () => {
+  assert.strictEqual(mercado.isoFecha('2026-09-25T10:00:00-04:00'), '2026-09-25');
+  assert.strictEqual(mercado.isoFecha('ayer'), null);
+  assert.strictEqual(mercado.isoFecha(''), null);
+});
+t('buscarFuente encuentra por nombre', () => {
+  const l = mercado.parseDolarApiLista(JSON_EUROS);
+  assert.strictEqual(mercado.buscarFuente(l, 'euro').valor, 972.648677);
+  assert.strictEqual(mercado.buscarFuente(l, 'paralelo').valor, 1074.366748);
+  assert.strictEqual(mercado.buscarFuente(l, 'bitcoin'), null);
+  assert.strictEqual(mercado.buscarFuente(null, 'euro'), null);
+});
+
+console.log('mercado: combinar y calcular');
+t('combinarMercado cuenta las disponibles', () => {
+  const m = mercado.combinarMercado({
+    bcv: { valor: 857.0058 },
+    paralelo: { valor: 943.89 },
+    euroOficial: null,
+    euroParalelo: null,
+  });
+  assert.strictEqual(m.disponible, 2);
+  assert.strictEqual(m.euroOficial, null);
+  assert.ok(m.consultadasEn > 0);
+});
+t('combinarMercado con todo null no revienta', () => {
+  const m = mercado.combinarMercado({});
+  assert.strictEqual(m.disponible, 0);
+  assert.strictEqual(m.bcv, null);
+});
+t('diferenciaPct: el paralelo esta ~10% sobre el BCV', () => {
+  assert.strictEqual(mercado.diferenciaPct(943.89, 857.0058), 10.1);
+});
+t('diferenciaPct con la misma tasa da 0', () => {
+  assert.strictEqual(mercado.diferenciaPct(857.0058, 857.0058), 0);
+});
+t('diferenciaPct puede ser negativa', () => {
+  assert.strictEqual(mercado.diferenciaPct(800, 857), -6.7);
+});
+t('diferenciaPct sin referencia devuelve null', () => {
+  assert.strictEqual(mercado.diferenciaPct(100, 0), null);
+  assert.strictEqual(mercado.diferenciaPct(0, 100), null);
+  assert.strictEqual(mercado.diferenciaPct(null, 100), null);
+});
+t('convertir multiplica y redondea a 2 decimales', () => {
+  assert.strictEqual(mercado.convertir(100, 857.0058), 85700.58);
+  assert.strictEqual(mercado.convertir(1, 857.0058), 857.01);
+  assert.strictEqual(mercado.convertir(10, 0.125), 1.25);
+});
+t('convertir devuelve null si falta la tasa o el monto no es numero', () => {
+  assert.strictEqual(mercado.convertir(100, 0), null);
+  assert.strictEqual(mercado.convertir('abc', 857), null);
+  assert.strictEqual(mercado.convertir(null, 857), null);
+});
+t('convertir con monto 0 devuelve 0 (la UI lo filtra antes)', () => {
+  assert.strictEqual(mercado.convertir(0, 857), 0);
+});
+t('convertidor al revés: Bs a divisa', () => {
+  assert.strictEqual(mercado.convertir(85700.58, 1 / 857.0058), 100);
 });
 
 console.log('\n' + passed + ' pruebas pasaron ✔');

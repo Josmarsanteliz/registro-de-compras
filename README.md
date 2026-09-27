@@ -6,11 +6,9 @@ App de escritorio (local) para llevar el registro de compras en **BTC, USDT, USD
 
 **Si solo quieres usar la app** (no necesitas Node.js ni saber nada de programación):
 
-1. Ve a **[Releases](https://github.com/Josmarsanteliz/registro-de-compras/releases)** y descarga uno de los dos:
-   - **`Registro-de-Compras-Setup.exe`** → instalador normal, con acceso directo y desinstalador.
-   - **`Registro-de-Compras-Portable.exe`** → no instala nada, se abre con doble clic. Ideal para una USB o para probarla sin comprometerse a instalarla.
-2. Si elegiste el instalador: ábrelo, elige la carpeta (o deja la que viene por defecto) y dale *Instalar*.
-3. Listo: aparece el acceso directo **"Registro de Compras"** en el escritorio y en el Menú Inicio.
+1. Ve a **[Releases](https://github.com/Josmarsanteliz/registro-de-compras/releases)** y descarga **`Registro-de-Compras-Setup.exe`**.
+2. Ábrelo. Elige la carpeta de instalación (o deja la que viene por defecto) y dale *Instalar*. **No pide permisos de administrador.**
+3. Listo: aparece el acceso directo **"Registro de Compras"** en tu escritorio y en tu Menú Inicio.
 
 **O desde el código** (si clonaste el repositorio):
 
@@ -30,7 +28,7 @@ Es **normal** y no es un virus: el instalador no está firmado, así que Windows
 2. Abajo te va a aparecer **"Ejecutar de todas formas"**.
 3. Clic ahí. Listo, ya no te lo vuelve a pedir.
 
-Pasa solo la primera vez. Si prefieres evitarlo del todo, usa el **portable**: no pide instalación, pero el aviso aparece igual al abrirlo.
+Pasa solo la primera vez. Si prefieres evitarlo del todo, en el menú ☰ → *Tasa del BCV* puedes poner la tasa a mano y la app deja de consultarla al abrir.
 
 > Tus datos **nunca** se borran al desinstalar ni al reinstalar: viven en `%APPDATA%\Registro de Compras\datos\registro.json`. Aun así, saca respaldos de vez en cuando (menú ☰ → *Exportar respaldo*).
 
@@ -43,7 +41,7 @@ Pasa solo la primera vez. Si prefieres evitarlo del todo, usa el **portable**: n
 ## Cómo usarla
 1. **[Instalada]** Doble clic en el acceso directo **"Registro de Compras"** del escritorio o del Menú Inicio.
    - **[Desde el código]** Doble clic en **`iniciar.bat`**.
-2. La app **abre directo** (sin contraseña). Pestañas **Todo / BTC / USDT / USD / Bs / 💼 Cartera / 🏦 Préstamos / 🗓️ Calendario**: cada una muestra solo sus registros y totales. "Todo" muestra el panorama completo.
+2. La app **abre directo** (sin contraseña). Pestañas **Todo / BTC / USDT / USD / Bs / 💱 Tasas / 💼 Cartera / 🏦 Préstamos / 🗓️ Calendario**: cada una muestra solo sus registros y totales. "Todo" muestra el panorama completo.
 3. Solo se abre **una ventana**: si vuelves a dar clic estando abierta, simplemente se enfoca.
 
 ## Funciones
@@ -59,6 +57,34 @@ Pasa solo la primera vez. Si prefieres evitarlo del todo, usa el **portable**: n
 - **Filtros**: buscar por texto, categoría, exchange y rango de fechas.
 - **Respaldo**: menú ☰ → Exportar respaldo (archivo JSON), Importar respaldo y Exportar CSV (compatible con Excel; incluye la columna Tipo y una sección de Préstamos).
 - **Diseño**: paleta dark (Carbon Black `#252422`, Charcoal `#403d39`, Silver `#ccc5b9`, Floral White `#fffcf2`, Spicy Paprika `#eb5e28`), tarjetas y botones neumórficos, logo de la app en el encabezado.
+
+## 💱 Tasas de mercado
+
+Una pestaña con las tasas de cambio de hoy, para saber a qué está todo sin buscar en otro lado:
+
+| Tarjeta | De dónde sale |
+|---|---|
+| **BCV (oficial)** | El sitio del BCV directo, que es el dato más actual |
+| **Dólar paralelo** | DolarAPI |
+| **Euro oficial** y **Euro paralelo** | DolarAPI |
+
+Cada tarjeta muestra **su fuente y su fecha**, y si un dato tiene más de 24 horas te lo avisa
+en vez de presentarlo como nuevo. Pasa con el euro oficial, que suele ir unos días atrasado:
+es la fuente, no un error, y prefiero que lo veas.
+
+Además, en el **paralelo y los euros** te muestra **cuánto están por encima del BCV** en
+porcentaje. Ese número es la "prima" que en Venezuela casi siempre existe, y es justo lo que
+necesitás para saber a qué cotiza de verdad el USDT.
+
+**Convertidor:** escribís un monto, elegís con qué tasa, y te dice el resultado en Bs. Con la
+casilla *Calcular al revés* hacés Bs → divisa. Es solo un cálculo, no guarda nada.
+
+Se actualiza sola al abrir la app, tiene **Actualizar ahora** cuando la quieras, y guarda el
+historial de las últimas consultas en una tabla con las cuatro columnas.
+
+> Esta pestaña es **informativa**: no cambia la tasa de referencia de la app, que sigue
+> viniendo del BCV. Para usar otra tasa en los registros que no traen una propia, se cambia en
+> el menú ☰ → *Tasa del BCV*.
 
 ## Tasa del BCV
 - Al abrir la app se consulta **sola** la tasa oficial del BCV y queda como *tasa de referencia*, para que los registros y préstamos que no tienen tasa propia se calculen solos.
@@ -77,7 +103,7 @@ compras\
 ├── main.js          → ventana, persistencia (JSON), IPC, instancia única
 ├── preload.js       → API segura para la interfaz
 ├── core.js          → lógica pura (validaciones, cadena, conversiones, saldos, CSV)
-├── bcv.js           → tasa del BCV (parsers puros + red, con DolarAPI de respaldo)
+├── mercado.js       → tasas de mercado (BCV + DolarAPI): parsers puros y red
 ├── AGENTS.md        → instrucciones del proyecto para el agente
 ├── test-core.js     → pruebas: node test-core.js
 ├── smoke.js         → prueba end-to-end de la app
@@ -94,7 +120,7 @@ compras\
 npm.cmd start                  :: inicia la app
 npm.cmd test                   :: corre las pruebas de la lógica (no necesita instalar nada)
 npm.cmd run smoke              :: corre el smoke test (necesita npm.cmd install antes)
-npm.cmd run dist               :: genera el instalador y el portable en release\
+npm.cmd run dist               :: genera el instalador en release\
 ```
 
 ## Publicar una versión nueva
@@ -104,7 +130,7 @@ archivo de más de 100 MB. Los `.exe` van como adjuntos de una *release*, que ad
 
 ```bat
 npm.cmd run dist
-gh release create v1.2.0 "release\Registro-de-Compras-Setup.exe" "release\Registro-de-Compras-Portable.exe" --generate-notes
+gh release create v1.2.0 "release\Registro-de-Compras-Setup.exe" --generate-notes
 ```
 
 Mientras no publiques una release nueva, `instalar.bat` sigue descargando la última que exista.

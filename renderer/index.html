@@ -78,6 +78,41 @@
       </div>
     </section>
 
+    <!-- ============ VISTA: TASAS DE MERCADO ============ -->
+    <section id="view-tasas" class="tasas-view hidden">
+      <div class="tasas-head">
+        <p class="muted">Tasas de cambio de hoy. Cada tarjeta muestra su fuente y su fecha: si un dato tiene más de 24 horas, te lo aviso en vez de presentarlo como nuevo.</p>
+        <button id="mercado-refresh" class="btn">↻ Actualizar ahora</button>
+      </div>
+      <div id="mercado-actual" class="mercado-grid"></div>
+      <div id="mercado-error" class="error hidden"></div>
+
+      <div class="convertidor card">
+        <h3>Convertidor</h3>
+        <div class="conv-fila">
+          <label class="field">
+            <span>Monto</span>
+            <input type="number" id="cv-monto" class="input" step="any" min="0" placeholder="100">
+          </label>
+          <label class="field">
+            <span>Usando la tasa</span>
+            <select id="cv-tasa" class="input"></select>
+          </label>
+          <label class="field check">
+            <input type="checkbox" id="cv-invertir">
+            <span>Calcular al revés (Bs → divisa)</span>
+          </label>
+          <div class="field">
+            <span>Resultado</span>
+            <div id="cv-resultado" class="cv-resultado">—</div>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="sub-titulo">Historial</h3>
+      <div id="mercado-historial" class="mercado-historial"></div>
+    </section>
+
     <!-- ============ VISTA: CARTERA ============ -->
     <section id="view-cartera" class="cartera-view hidden">
       <div id="cartera-totals" class="totals"></div>

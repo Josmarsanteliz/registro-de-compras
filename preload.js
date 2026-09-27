@@ -26,6 +26,14 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeListener('tasa:actualizada', handler);
   },
 
+  getMercado: () => ipcRenderer.invoke('mercado:get'),
+  refreshMercado: () => ipcRenderer.invoke('mercado:refresh'),
+  onMercadoActualizado: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on('mercado:actualizado', handler);
+    return () => ipcRenderer.removeListener('mercado:actualizado', handler);
+  },
+
   exportBackup: () => ipcRenderer.invoke('backup:export'),
   importBackup: () => ipcRenderer.invoke('backup:import'),
   exportCsv: () => ipcRenderer.invoke('backup:exportCsv'),

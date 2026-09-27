@@ -7,6 +7,9 @@ const state = {
   settings: { tasaReferencia: 0, tasaFuente: 'BCV', tasaUltimaConsulta: 0, tasaUltimoError: null },
   tasa: null,
   tasaHistorial: [],
+  mercado: null,
+  mercadoHistorial: [],
+  mercadoError: null,
   activeTab: 'Todo',
   filters: { q: '', categoria: '', exchange: '', desde: '', hasta: '' },
   editingId: null,
@@ -314,6 +317,10 @@ function renderTabs() {
     if (m === 'Todo' || m === 'Calendario') return state.records.length;
     if (m === 'Préstamos') return state.loans.length;
     if (m === 'Cartera') return Object.keys(holdings(state.records).porExchange).length;
+    if (m === 'Tasas') {
+      const d = state.mercado;
+      return d ? d.disponible || 0 : 0;
+    }
     return state.records.filter((r) => r.moneda === m).length;
   };
   const defs = [
@@ -322,6 +329,7 @@ function renderTabs() {
     ['USDT', C.USDT.icon, 'USDT'],
     ['USD', C.USD.icon, 'USD'],
     ['Bs', C.Bs.icon, 'Bs'],
+    ['Tasas', '\u{1F4B1}', 'Tasas'],
     ['Cartera', '\u{1F4BC}', 'Cartera'],
     ['Préstamos', '\u{1F3E6}', 'Préstamos'],
     ['Calendario', '\u{1F5D3}\uFE0F', 'Calendario'],
@@ -488,8 +496,174 @@ function render() {
     renderCartera();
     return;
   }
+  if (state.activeTab === 'Tasas') {
+    renderMercado();
+    return;
+  }
   renderTotals();
   renderTable();
+}
+
+/* ============================== Tasas de mercado ============================== */
+// Espejo de mercado.js: diferenciaPct y convertir. Si cambias uno, cambia el otro.
+
+const ETIQUETAS_TASA = [
+  { key: 'bcv', nombre: 'BCV (oficial)', moneda: 'USD' },
+  { key: 'paralelo', nombre: 'Dólar paralelo', moneda: 'USD' },
+  { key: 'euroOficial', nombre: 'Euro oficial', moneda: 'EUR' },
+  { key: 'euroParalelo', nombre: 'Euro paralelo', moneda: 'EUR' },
+];
+
+function diferenciaPct(valor, referencia) {
+  if (!(valor > 0) || !(referencia > 0)) return null;
+  return Math.round(((valor - referencia) / referencia) * 1000) / 10;
+}
+
+function convertir(monto, tasa) {
+  if (monto === null || monto === undefined || monto === '') return null;
+  const m = Number(monto);
+  if (!isFinite(m) || !(tasa > 0)) return null;
+  return Math.round(m * tasa * 100) / 100;
+}
+
+// Cuántas horas tiene el dato, para no presentarlo como si fuera de hoy.
+function antiguedadHoras(fecha) {
+  if (!fecha) return null;
+  const d = new Date(fecha.length <= 10 ? fecha + 'T00:00:00' : fecha);
+  if (isNaN(d.getTime())) return null;
+  return Math.floor((Date.now() - d.getTime()) / 3600000);
+}
+
+function tarjetaTasa(def, referencia) {
+  const t = state.mercado ? state.mercado[def.key] : null;
+  if (!t || !(t.valor > 0)) {
+    return `<div class="mercado-card vacia">
+      <div class="mc-nombre">${esc(def.nombre)}</div>
+      <div class="mc-valor muted">—</div>
+      <div class="mc-meta">No se pudo consultar</div>
+    </div>`;
+  }
+  const horas = antiguedadHoras(t.fecha);
+  const viejo = horas !== null && horas >= 24;
+  const dif = def.key === 'bcv' ? null : diferenciaPct(t.valor, referencia);
+  const difTxt = dif === null ? '' :
+    `<span class="mc-dif ${dif >= 0 ? 'sube' : 'baja'}">${dif >= 0 ? '+' : ''}${fmtNum(dif)}% vs BCV</span>`;
+  return `<div class="mercado-card ${viejo ? 'viejo' : ''}">
+    <div class="mc-nombre">${esc(def.nombre)}</div>
+    <div class="mc-valor">Bs. <b>${fmtNum(t.valor)}</b></div>
+    <div class="mc-meta">
+      <span>por 1 ${def.moneda}</span> · <span>${esc(t.fuente)}</span>
+      ${t.fecha ? ` · <span title="${esc(t.fecha)}">${fmtDate(t.fecha)}</span>` : ''}
+    </div>
+    ${viejo ? `<div class="mc-aviso">⏳ Tiene ${horas >= 48 ? Math.floor(horas / 24) + ' días' : horas + ' h'} sin actualizarse</div>` : ''}
+    ${difTxt}
+  </div>`;
+}
+
+function renderMercado() {
+  const d = state.mercado;
+  const ref = d && d.bcv ? d.bcv.valor : 0;
+
+  const errBox = $('#mercado-error');
+  if (state.mercadoError) {
+    errBox.textContent = 'Algunas tasas no se pudieron consultar: ' + state.mercadoError;
+    errBox.classList.remove('hidden');
+  } else {
+    errBox.classList.add('hidden');
+  }
+
+  if (!d) {
+    $('#mercado-actual').innerHTML = '<div class="cal-empty">Todavía no hay tasas consultadas. Tocá "Actualizar ahora".</div>';
+  } else {
+    $('#mercado-actual').innerHTML = ETIQUETAS_TASA.map((x) => tarjetaTasa(x, ref)).join('');
+  }
+
+  // Selector del convertidor
+  const sel = $('#cv-tasa');
+  const previa = sel.value;
+  sel.innerHTML = ETIQUETAS_TASA
+    .filter((x) => d && d[x.key] && d[x.key].valor > 0)
+    .map((x) => `<option value="${x.key}">${esc(x.nombre)} — Bs. ${fmtNum(d[x.key].valor)}</option>`)
+    .join('') || '<option value="">Sin tasas disponibles</option>';
+  sel.value = ETIQUETAS_TASA.some((x) => x.key === previa) ? previa : sel.value;
+
+  renderMercadoHistorial();
+  actualizarConversion();
+}
+
+function renderMercadoHistorial() {
+  const hist = state.mercadoHistorial || [];
+  const el = $('#mercado-historial');
+  if (!hist.length) {
+    el.innerHTML = '<div class="muted">Sin historial todavía. Se guarda una fila por día.</div>';
+    return;
+  }
+  const cols = [
+    ['bcv', 'BCV'],
+    ['paralelo', 'Paralelo'],
+    ['euroOficial', 'Euro oficial'],
+    ['euroParalelo', 'Euro paralelo'],
+  ];
+  el.innerHTML = '<table class="tasa-tbl"><thead><tr><th>Fecha</th>'
+    + cols.map((c) => `<th>${c[1]}</th>`).join('')
+    + '</tr></thead><tbody>'
+    + hist.map((h) => '<tr><td>' + fmtDate(h.fecha) + '</td>'
+      + cols.map((c) => '<td>' + (h[c[0]] > 0 ? fmtNum(h[c[0]]) : '<span class="muted">—</span>') + '</td>').join('')
+      + '</tr>').join('')
+    + '</tbody></table>';
+}
+
+function actualizarConversion() {
+  const out = $('#cv-resultado');
+  const monto = num($('#cv-monto').value);
+  const key = $('#cv-tasa').value;
+  const def = ETIQUETAS_TASA.find((x) => x.key === key);
+  const t = state.mercado && key ? state.mercado[key] : null;
+  if (!def || !t || !(t.valor > 0)) {
+    out.textContent = '—';
+    return;
+  }
+  if (!(monto > 0)) {
+    out.textContent = '—';
+    return;
+  }
+  if ($('#cv-invertir').checked) {
+    const div = convertir(monto, 1 / t.valor);
+    out.innerHTML = `<b>${fmtNum(div)}</b> ${def.moneda}`;
+  } else {
+    const bs = convertir(monto, t.valor);
+    out.innerHTML = `Bs. <b>${fmtNum(bs)}</b>`;
+  }
+}
+
+async function cargarMercado() {
+  const res = await window.api.getMercado();
+  if (!res.ok) return;
+  state.mercado = res.mercado;
+  state.mercadoHistorial = res.historial || [];
+  if (state.activeTab === 'Tasas') render();
+}
+
+async function refrescarMercado() {
+  const btn = $('#mercado-refresh');
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const res = await window.api.refreshMercado();
+    state.mercado = res.mercado;
+    state.mercadoHistorial = res.historial || [];
+    state.mercadoError = res.ok ? null : res.error;
+    render();
+    if (res.ok) {
+      toast('Tasas actualizadas');
+    } else {
+      toast('No se pudieron actualizar las tasas', 'err');
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
 }
 
 /* ============================== Cartera ============================== */
@@ -573,14 +747,16 @@ function applyView() {
   const isCal = state.activeTab === 'Calendario';
   const isLoans = state.activeTab === 'Préstamos';
   const isCartera = state.activeTab === 'Cartera';
-  const isMain = !isCal && !isLoans && !isCartera;
+  const isTasas = state.activeTab === 'Tasas';
+  const isMain = !isCal && !isLoans && !isCartera && !isTasas;
   $('#totals').classList.toggle('hidden', !isMain);
   document.querySelector('.filters').classList.toggle('hidden', !isMain);
   $('#table-wrap').classList.toggle('hidden', !isMain);
   $('#view-calendar').classList.toggle('hidden', !isCal);
   $('#view-loans').classList.toggle('hidden', !isLoans);
   $('#view-cartera').classList.toggle('hidden', !isCartera);
-  $('#btn-new').classList.toggle('hidden', isCartera);
+  $('#view-tasas').classList.toggle('hidden', !isTasas);
+  $('#btn-new').classList.toggle('hidden', isCartera || isTasas);
   if (!isCal) $('#cal-jump').classList.add('hidden');
 }
 
@@ -1034,6 +1210,7 @@ async function enterApp() {
   if (set.ok) state.settings = set.settings;
   await reloadAll();
   await cargarTasa();
+  await cargarMercado();
   // El proceso principal consulta el BCV al abrir y avisa cuando termina.
   window.api.onTasaActualizada((payload) => {
     if (!payload) return;
@@ -1045,6 +1222,15 @@ async function enterApp() {
     }
     if (!$('#modal-settings').classList.contains('hidden')) renderTasaPanel();
     render();
+  });
+  // Lo mismo con el paralelo y los euros.
+  window.api.onMercadoActualizado((payload) => {
+    if (!payload) return;
+    state.mercado = payload.mercado;
+    state.mercadoHistorial = payload.historial || state.mercadoHistorial;
+    state.mercadoError = payload.ok ? null : payload.error;
+    if (state.activeTab === 'Tasas') render();
+    else renderTabs();
   });
   render();
 }
@@ -1484,6 +1670,13 @@ function bindEvents() {
     const b = e.target.closest('[data-ver-exchange]');
     if (b) verExchange(b.dataset.verExchange);
   });
+
+  // Tasas de mercado
+  $('#mercado-refresh').addEventListener('click', refrescarMercado);
+  for (const sel of ['#cv-monto', '#cv-tasa', '#cv-invertir']) {
+    $(sel).addEventListener('input', actualizarConversion);
+    $(sel).addEventListener('change', actualizarConversion);
+  }
 
   // Tasa BCV: refresco y errores que llegan desde el proceso principal
   $('#tasa-refresh').addEventListener('click', async (e) => {

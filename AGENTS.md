@@ -166,6 +166,21 @@ gh release create v1.2.0 release\Registro-de-Compras-Setup.exe --generate-notes
 `instalar.bat` descarga siempre de `releases/latest/download/...`, así que no hay que tocar
 ese archivo al publicar: apunta solo a "la última release".
 
+### Trampa: `instalar.bat` NO debe descargar en `release\`
+
+`release\` es la carpeta de salida **del build**. Si `instalar.bat` descarga ahí, en el propio
+repo el archivo ya existe, el `if exist` se lo salta y termina ejecutando el **binario viejo
+del build** en vez del publicado (que fue exactamente el bug que pasó). Además, 107 MB sin
+barra de progreso hacen que el usuario cierre la consola y se vaya sin instalar nada.
+
+Por eso descarga en `%LOCALAPPDATA%\Registro de Compras\instalador\`, usa `curl.exe` (que ya
+viene en Windows y sí muestra progreso) y siempre imprime ruta, tamaño y fecha de lo que va a
+ejecutar. Si tocas ese archivo, conserva esas tres cosas.
+
+Además, `.bat` es un lenguaje de shell con trampas: los signos `%` se escriben `%VARIABLE%`,
+no `%%VARIABLE%%` (con doble % se imprime literal), y dentro de un `for` la variable del
+bucle sí es `%%A`. No copies sintaxis de bash.
+
 Reglas al commitear:
 
 - **Nunca** subas `datos/`, `release/` ni `node_modules/`. Ya están en `.gitignore`; antes de
@@ -190,3 +205,13 @@ subas a ningún lado.
 - `build.nsis.deleteAppDataOnUninstall` está en `false` **a propósito**: el default de
   electron-builder es `true` y desinstalaría los registros del usuario. Si tocas ese bloque,
   déjalo en `false`.
+- `build.nsis.perMachine: false` **y `allowElevation: false`**. Con `oneClick: false` y solo
+  `perMachine: false` el asistente igual ofrecía instalar "para todos los usuarios": metía el
+  uninstall en `HKLM` con `/allusers`, dejaba la app en `C:\Program Files`, pedía
+  administrador, y el acceso directo caía en `C:\Users\Public\Desktop` en vez del escritorio
+  del usuario. `allowElevation: false` cierra esa puerta: instala siempre en
+  `%LOCALAPPDATA%\Programs` sin pedir permisos. **No lo quites** salvo que quieras
+  deliberadamente la instalación para todo el sistema.
+- Al verificar una instalación, mira **las tres** cosas: carpeta en
+  `%LOCALAPPDATA%\Programs\Registro de Compras`, clave de desinstalación en el registro, y el
+  `.lnk` en el escritorio del usuario. Con que falte una, la instalación está incompleta.

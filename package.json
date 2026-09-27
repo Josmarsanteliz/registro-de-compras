@@ -8,7 +8,7 @@
     "start": "electron .",
     "test": "node test-core.js",
     "smoke": "electron smoke.js",
-    "dist": "electron-builder --win nsis"
+    "dist": "electron-builder --win"
   },
   "author": "",
   "license": "UNLICENSED",
@@ -35,14 +35,19 @@
     },
     "win": {
       "target": [
-        "nsis"
+        "nsis",
+        "portable"
       ],
       "icon": "Logo/app.ico",
       "signExecutable": false
     },
+    "portable": {
+      "artifactName": "Registro-de-Compras-Portable.exe"
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
+      "allowElevation": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,

@@ -6,8 +6,10 @@ App de escritorio (local) para llevar el registro de compras en **BTC, USDT, USD
 
 **Si solo quieres usar la app** (no necesitas Node.js ni saber nada de programación):
 
-1. Ve a **[Releases](https://github.com/Josmarsanteliz/registro-de-compras/releases)** y descarga **`Registro-de-Compras-Setup.exe`** (la última versión).
-2. Ábrelo. Elige la carpeta de instalación (o deja la que viene por defecto) y dale *Instalar*.
+1. Ve a **[Releases](https://github.com/Josmarsanteliz/registro-de-compras/releases)** y descarga uno de los dos:
+   - **`Registro-de-Compras-Setup.exe`** → instalador normal, con acceso directo y desinstalador.
+   - **`Registro-de-Compras-Portable.exe`** → no instala nada, se abre con doble clic. Ideal para una USB o para probarla sin comprometerse a instalarla.
+2. Si elegiste el instalador: ábrelo, elige la carpeta (o deja la que viene por defecto) y dale *Instalar*.
 3. Listo: aparece el acceso directo **"Registro de Compras"** en el escritorio y en el Menú Inicio.
 
 **O desde el código** (si clonaste el repositorio):
@@ -18,7 +20,17 @@ cd registro-de-compras
 instalar.bat
 ```
 
-`instalar.bat` descarga la última versión publicada y abre el instalador. Si prefieres compilar desde el código, `npm.cmd install` y después `npm.cmd start`.
+`instalar.bat` descarga la última versión publicada y abre el instalador, con barra de progreso (son 107 MB, puede tardar). Si prefieres compilar desde el código, `npm.cmd install` y después `npm.cmd start`.
+
+### ⚠️ Si Windows te avisa que "protegió tu PC"
+
+Es **normal** y no es un virus: el instalador no está firmado, así que Windows lo marca como desconocido hasta la primera vez.
+
+1. Clic en **"Más información"**.
+2. Abajo te va a aparecer **"Ejecutar de todas formas"**.
+3. Clic ahí. Listo, ya no te lo vuelve a pedir.
+
+Pasa solo la primera vez. Si prefieres evitarlo del todo, usa el **portable**: no pide instalación, pero el aviso aparece igual al abrirlo.
 
 > Tus datos **nunca** se borran al desinstalar ni al reinstalar: viven en `%APPDATA%\Registro de Compras\datos\registro.json`. Aun así, saca respaldos de vez en cuando (menú ☰ → *Exportar respaldo*).
 
@@ -74,7 +86,7 @@ compras\
 ├── datos\           → registro.json (se genera solo; NO se sube al repo)
 ├── iniciar.bat      → lanzador para correr la app desde el código
 ├── instalar.bat     → descarga el instalador desde la release de GitHub
-└── release\         → aquí se genera el instalador (NO se sube al repo)
+└── release\         → aquí se generan los .exe del build (NO se sube al repo)
 ```
 
 ## Comandos
@@ -82,17 +94,17 @@ compras\
 npm.cmd start                  :: inicia la app
 npm.cmd test                   :: corre las pruebas de la lógica (no necesita instalar nada)
 npm.cmd run smoke              :: corre el smoke test (necesita npm.cmd install antes)
-npm.cmd run dist               :: genera release\Registro-de-Compras-Setup.exe (instalador)
+npm.cmd run dist               :: genera el instalador y el portable en release\
 ```
 
 ## Publicar una versión nueva
 
-El `.exe` **no** se sube a git (pesa ~97 MB y GitHub bloquea archivos de más de 100 MB).
-Va como adjunto de una *release*, que admite hasta 2 GB:
+El `.exe` **no** se sube a git: el instalador pesa 107 MB y GitHub bloquea con error cualquier
+archivo de más de 100 MB. Los `.exe` van como adjuntos de una *release*, que admite hasta 2 GB:
 
 ```bat
 npm.cmd run dist
-gh release create v1.2.0 release\Registro-de-Compras-Setup.exe --generate-notes
+gh release create v1.2.0 "release\Registro-de-Compras-Setup.exe" "release\Registro-de-Compras-Portable.exe" --generate-notes
 ```
 
 Mientras no publiques una release nueva, `instalar.bat` sigue descargando la última que exista.
